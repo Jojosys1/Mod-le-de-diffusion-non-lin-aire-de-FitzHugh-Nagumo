@@ -144,7 +144,7 @@ Distribué sous licence MIT. Voir `LICENSE` pour plus d'informations.
 
 **Groupe 3** - Projet de modélisation mathématique
 
-Lien du projet : [https://github.com/votre-username/fitzhugh-nagumo-model](https://github.com/votre-username/fitzhugh-nagumo-model)
+Lien du projet :(https://github.com/Jojosys1/Mod-le-de-diffusion-non-lin-aire-de-FitzHugh-Nagumo)
 
 ## 🙏 Remerciements
 
