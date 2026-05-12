@@ -1,0 +1,812 @@
+\documentclass[10pt]{beamer}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                        PACKAGES                                %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                     THÈME BEAMER                               %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{mainblue}{RGB}{20, 60, 120}
+\definecolor{lightblue}{RGB}{220, 232, 248}
+\definecolor{midblue}{RGB}{100, 140, 200}
+\definecolor{darktext}{RGB}{30, 30, 30}
+
+\usetheme{Madrid}
+\usecolortheme[named=midblue]{structure}
+\useoutertheme{infolines}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\small$\bullet$}
+\setbeamertemplate{itemize subitem}{\small$\circ$}
+
+\setbeamercolor{block title}{bg=mainblue, fg=white}
+\setbeamercolor{block body}{bg=lightblue, fg=darktext}
+\setbeamercolor{block title example}{bg=mainblue!70!black, fg=white}
+\setbeamercolor{block body example}{bg=lightblue!60, fg=darktext}
+
+\setbeamertemplate{footline}{
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.34\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+      \usebeamerfont{date in head/foot}
+      \insertframenumber{} / \inserttotalframenumber\hspace*{1.5ex}
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+\newcommand{\framewithtitle}[1]{%
+\begin{frame}[c]{}
+  \begin{center}
+  \Huge
+    \begin{tcolorbox}
+      \emph{
+        \espace
+        \begin{center}
+          \textcolor{black}{#1}
+        \end{center}
+        \espace
+      }
+    \end{tcolorbox}
+  \end{center}
+\end{frame}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                    TITRE / AUTEURS                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title[Équation de Nagumo]{Analyse et simulation numérique\\de l'équation de Nagumo}
+\subtitle{Étude théorique, schémas numériques et stabilité}
+\titlegraphic{\includegraphics[height=2.0cm]{img/logo1.jpg}}
+\author[GLODJO \& HOMEVO \& AGRO]{M.\,J. GLODJO \quad K. HOMEVO \quad  T. Rachidi \\[4pt]
+  \small Sous la supervision de \textbf{Dr Jamal ADETOLA}}
+\institute[ENSGMM -- UNSTIM]{TP de Problèmes instationnaires -- ENSGMM}
+\date{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%--- Diapo 1 : Page de titre
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%--- Diapo 2 : Plan
+\begin{frame}{Plan}
+  \tableofcontents[hideallsubsections]
+\end{frame}
+
+\begin{frame}{Introduction}
+\begin{itemize}
+    \item \textbf{Contexte} : circuit électronique actif proposé par Nagumo, Arimoto et Yoshizawa (1962), prolongeant les travaux de Hodgkin \& Huxley.
+    \item \textbf{Réduction bistable} du système de Hodgkin-Huxley $\rightarrow$ équation de réaction-diffusion non linéaire (équation de Nagumo).
+    \item \textbf{Non-linéarité cubique} $\rightarrow$ structure bistable : deux états stables séparés par un seuil instable.
+    \item \textbf{Propriété clé} : génère des fronts voyageurs reliant ces deux états – modèle paradigmatique pour l'étude analytique et numérique.
+    \item \textbf{Objectifs du rapport} :
+    \begin{itemize}
+        \item Analyse théorique rigoureuse des propriétés qualitatives.
+        \item Construction et analyse de quatre schémas numériques.
+        \item Étude de la stabilité des schémas et établissement des conditions de convergence.
+        \item Validation par simulation numérique et comparaison des performances.
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+\section{Analyse théorique}
+\framewithtitle{Analyse théorique}
+
+\begin{frame}{Modèle générique de réaction-diffusion}
+
+\begin{equation}
+  \frac{\partial u}{\partial t} = D\,\Delta u + f(u)
+\end{equation}
+
+\bigskip
+
+\textbf{Forme de Nagumo} — cinétique cubique bistable :
+\begin{equation}
+  \frac{\partial u}{\partial t} = D\,\Delta u + u(1-u)(u-a), \qquad a \in (0,1)
+\end{equation}
+
+\bigskip
+
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  Symbole & Nom & Rôle \\
+  \midrule
+  $u(\mathbf{x,y},t)$ & Potentiel de membrane   & Variable d'état adimensionnée \\[4pt]
+  $D > 0$           & Coefficient de diffusion & Propagation passive par couplage électrotonique \\[4pt]
+  $f(u)$            & Terme de réaction        & Mécanismes ioniques d'excitabilité \\[4pt]
+  $a \in (0,1)$     & Seuil d'excitabilité     & Contrôle le basculement entre les deux états stables \\
+  \bottomrule
+\end{tabular}
+
+\end{frame}
+
+\begin{frame}{Formulation du problème}
+
+On cherche $u : \Omega \times (0,+\infty) \to \mathbb{R}$ solution de :
+
+\begin{equation}
+  \begin{cases}
+    \displaystyle\frac{\partial u}{\partial t} = D\,\Delta u + u(1-u)(u-a),
+    & (x,y) \in \Omega,\; t > 0, \\[10pt]
+    u(x,y,0) = u_0(x,y),
+    & (x,y) \in \Omega, \\[6pt]
+    \text{C.L. sur } \partial\Omega,
+    & t > 0.
+  \end{cases}
+\end{equation}
+
+\bigskip
+
+\textbf{Conditions aux limites usuelles}
+
+\medskip
+
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  Type & Condition & Interprétation physique \\
+  \midrule
+  Dirichlet & $u = 0 \text{ sur } \partial\Omega$ & Bord maintenu au potentiel de repos \\[4pt]
+  Neumann   & $\dfrac{\partial u}{\partial \mathbf{n}} = 0 \text{ sur } \partial\Omega$
+            & Isolation électrique — flux nul au bord \\
+  \bottomrule
+\end{tabular}
+
+\end{frame}
+
+\begin{frame}{Équilibres et stabilité}
+
+Les états homogènes stationnaires vérifient $f(u^*) = 0$ :
+
+\begin{equation}
+  u^*(1-u^*)(u^*-a) = 0
+  \qquad \Longrightarrow \qquad
+  u^*_1 = 0, \quad u^*_2 = a, \quad u^*_3 = 1.
+\end{equation}
+
+\bigskip
+
+\textbf{Analyse de stabilité linéaire} — signe de $f'(u^*)$ :
+
+\begin{equation}
+  f'(u) = -3u^2 + 2(1+a)u - a
+\end{equation}
+
+\medskip
+
+\begin{tabular}{@{}llll@{}}
+  \toprule
+  Équilibre & $f'(u^*)$ & Stabilité & Rôle \\
+  \midrule
+  $u^* = 0$ & $-a < 0$        & asymptotiquement stable & état de repos \\[4pt]
+  $u^* = a$ & $a(1-a) > 0$    & instable                & seuil d'excitation \\[4pt]
+  $u^* = 1$ & $-(1-a) < 0$    & asymptotiquement stable & état excité \\
+  \bottomrule
+\end{tabular}
+
+\end{frame}
+
+
+\begin{frame}{Fronts voyageurs en 2D}
+
+Ansatz : $u(x,y,t) = \phi(\xi)$, \quad $\xi = x\cos\theta + y\sin\theta - ct$
+
+\medskip
+
+\textbf{ODE du front} — identique au cas 1D :
+\begin{equation}
+  D\,\phi'' + c\,\phi' + \phi(1-\phi)(\phi-a) = 0,
+  \qquad \phi(-\infty)=1,\quad \phi(+\infty)=0.
+\end{equation}
+
+\textbf{Solution exacte et vitesse critique :}
+\begin{equation}
+  \phi^*(\xi) = \frac{1}{1+e^{\,\xi/\sqrt{2D}}}, \qquad
+  \boxed{c^* = \sqrt{2D}\!\left(\tfrac{1}{2}-a\right).}
+\end{equation}
+
+\textbf{Propriétés clés :}
+
+\begin{itemize}
+  \item $c^*$ est indépendante de la direction de propagation $\theta$
+  \item $a < \tfrac{1}{2}$ : front avançant ; \quad
+        $a = \tfrac{1}{2}$ : front stationnaire ; \quad
+        $a > \tfrac{1}{2}$ : front reculant
+  \item largeur caractéristique du profil : $\ell = \sqrt{2D}$
+  \item stabilité orbitale : un front perturbé converge vers $\phi^*$
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Principe du maximum et existence globale}
+
+Pour $u_0 \in L^\infty(\Omega)$ et $\Omega$ borné régulier :
+
+\bigskip
+
+\textbf{Principe du maximum :}
+
+\begin{itemize}
+  \item $u_0(x,y) \in [0,1] \;\Rightarrow\; u(x,y,t) \in [0,1]$ pour tout $t \geq 0$
+  \item au point de maximum $\Delta u \leq 0$, donc si $M > 1$ alors $f(M) < 0$
+        et $\partial_t M < 0$ : le maximum ne peut dépasser~1
+\end{itemize}
+
+\bigskip
+
+\textbf{Conséquences :}
+
+\begin{itemize}
+  \item borne a priori $\Rightarrow$ existence globale sur $[0, +\infty)$
+  \item la solution reste dans la région physique $[0,1]$
+  \item les schémas explicites avec $\Delta t$ trop grand violent ce principe
+        et produisent des oscillations parasites
+\end{itemize}
+
+\end{frame}
+
+\section{Analyse numérique}
+\framewithtitle{Analyse numérique}
+
+\begin{frame}{Discrétisation spatiale — schéma à cinq points}
+
+Grille uniforme : $x_i = i\,\Delta x$, $y_j = j\,\Delta y$, \quad
+$u_{i,j}^n \approx u(x_i, y_j, t^n)$.
+
+\bigskip
+
+\begin{center}
+\begin{tikzpicture}[scale=1.2]
+  % Grille légère
+  \draw[gray!30] (-2,-2) grid (2,2);
+
+  % Liaisons du stencil
+  \draw[thick] (0,0) -- (1,0);
+  \draw[thick] (0,0) -- (-1,0);
+  \draw[thick] (0,0) -- (0,1);
+  \draw[thick] (0,0) -- (0,-1);
+
+  % Points voisins
+  \filldraw[black] ( 1, 0) circle (3pt) node[right=4pt] {$u_{i+1,j}$};
+  \filldraw[black] (-1, 0) circle (3pt) node[left=4pt]  {$u_{i-1,j}$};
+  \filldraw[black] ( 0, 1) circle (3pt) node[above=4pt] {$u_{i,j+1}$};
+  \filldraw[black] ( 0,-1) circle (3pt) node[below=4pt] {$u_{i,j-1}$};
+
+  % Point central
+  \filldraw[red] (0,0) circle (3.5pt) node[above right=4pt] {$u_{i,j}$};
+
+  % Axes
+  \draw[->] (-2.2,0) -- (2.4,0) node[right] {$x$};
+  \draw[->] (0,-2.2) -- (0,2.4) node[above] {$y$};
+
+  % Labels dx, dy
+  \draw[<->] (0,-1.6) -- (1,-1.6) node[midway, below] {$\Delta x$};
+  \draw[<->] (1.6,0)  -- (1.6,1) node[midway, right] {$\Delta y$};
+\end{tikzpicture}
+\end{center}
+
+\end{frame}
+
+\begin{frame}{Discrétisation spatiale — détails}
+
+\textbf{Approximation du Laplacien 2D :}
+\begin{equation}
+  \Delta_h u_{i,j}^n =
+  \frac{u_{i+1,j}^n - 2u_{i,j}^n + u_{i-1,j}^n}{(\Delta x)^2}
+  + \frac{u_{i,j+1}^n - 2u_{i,j}^n + u_{i,j-1}^n}{(\Delta y)^2}
+\end{equation}
+
+\bigskip
+
+\textbf{Propriétés de $A_{2D}$ :}
+
+\begin{itemize}
+  \item structure de Kronecker :
+        $A_{2D} = I_{N_y} \otimes A_x + A_y \otimes I_{N_x}$
+  \item matrice creuse, symétrique, semi-définie négative
+  \item valeur propre extrême : $|\lambda_{\max}| = 8D/h^2$
+        — deux fois plus grande qu'en 1D
+  \item erreur de troncature : $O\!\left((\Delta x)^2 + (\Delta y)^2\right)$
+\end{itemize}
+
+\bigskip
+
+\textbf{Conditions de Neumann} — points fantômes :
+\begin{equation}
+  u_{-1,j}^n = u_{1,j}^n, \quad
+  u_{N_x+1,j}^n = u_{N_x-1,j}^n, \quad
+  u_{i,-1}^n = u_{i,1}^n, \quad
+  u_{i,N_y+1}^n = u_{i,N_y-1}^n.
+\end{equation}
+
+\end{frame}
+
+\begin{frame}{Runge-Kutta 4 — Description de l'algorithme}
+
+Méthode explicite à un pas, d'ordre 4 en temps. On note
+$G(\mathbf{U}) = A_{2D}\mathbf{U} + F(\mathbf{U})$ le flux total.
+
+\bigskip
+
+\textbf{Les quatre étapes :}
+
+\begin{itemize}
+  \item $K_1 = G(\mathbf{U}^n)$
+  \item $K_2 = G\!\left(\mathbf{U}^n + \tfrac{\Delta t}{2}K_1\right)$
+  \item $K_3 = G\!\left(\mathbf{U}^n + \tfrac{\Delta t}{2}K_2\right)$
+  \item $K_4 = G\!\left(\mathbf{U}^n + \Delta t\, K_3\right)$
+\end{itemize}
+
+\bigskip
+
+\textbf{Mise \`a jour :}
+\begin{equation}
+  \boxed{\mathbf{U}^{n+1} = \mathbf{U}^n
+    + \frac{\Delta t}{6}\bigl(K_1 + 2K_2 + 2K_3 + K_4\bigr).}
+\end{equation}
+
+\end{frame}
+
+\begin{frame}{Runge-Kutta 4 — Schéma numérique}
+
+\textbf{Mise à jour :}
+\begin{equation}
+  \boxed{\mathbf{U}^{n+1} = \mathbf{U}^n
+    + \frac{\Delta t}{6}\bigl(K_1 + 2K_2 + 2K_3 + K_4\bigr)}
+\end{equation}
+
+\bigskip
+
+\textbf{Implémentation pratique du produit $A_{2D}\mathbf{U}$ :}
+\begin{equation}
+  (A_{2D}\mathbf{U})_{i,j} =
+  D\,\frac{U_{i-1,j} - 2U_{i,j} + U_{i+1,j}}{(\Delta x)^2}
+  + D\,\frac{U_{i,j-1} - 2U_{i,j} + U_{i,j+1}}{(\Delta y)^2}
+\end{equation}
+
+\medskip
+
+\begin{itemize}
+  \item exploitation de la structure à cinq points — pas de stockage de $A_{2D}$
+  \item $\mathbf{U}^n$ stocké comme tableau 2D de taille $(N_x{+}1)\times(N_y{+}1)$
+  \item 4 évaluations de $G$ par pas de temps, coût $O(N_x N_y)$ chacune
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Runge-Kutta 4 — Stabilité et convergence}
+
+\textbf{Facteur d'amplification} sur $u' = \lambda u$, $z = \Delta t\,\xi_{k_1,k_2}$ :
+\begin{equation}
+  \zeta(z) = 1 + z + \frac{z^2}{2} + \frac{z^3}{6} + \frac{z^4}{24}
+\end{equation}
+
+\bigskip
+
+\textbf{Condition de stabilité CFL en 2D} — $|\zeta(z)| \leq 1$ pour $z \geq -2{,}79$ :
+\begin{equation}
+  \Delta t \cdot \frac{8D}{h^2} \leq 2{,}79
+  \qquad \Longrightarrow \qquad
+  \boxed{\mu = \frac{D\,\Delta t}{h^2} \leq 0{,}349}
+\end{equation}
+
+\bigskip
+
+\begin{itemize}
+  \item ordre 4 en temps, ordre 2 en espace — erreur globale $O((\Delta t)^4 + h^2)$
+  \item condition CFL \textbf{deux fois plus restrictive} qu'en 1D ($\mu \leq 0{,}697$)
+  \item stabilité conditionnelle : $\Delta t$ contraint par le maillage
+  \item meilleure précision temporelle parmi les schémas explicites
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Euler Implicite — Description de l'algorithme}
+
+Approche \textbf{semi-implicite} : diffusion traitée implicitement,
+réaction traitée explicitement.
+
+\bigskip
+
+\textbf{Principe :}
+\begin{itemize}
+  \item discrétisation temporelle par différence progressive d'ordre 1
+  \item terme diffusif évalué en $t^{n+1}$ — stabilité inconditionnelle
+  \item terme réactif évalué en $t^n$ — linéarité du système à résoudre
+\end{itemize}
+
+\bigskip
+
+\textbf{Algorithme par pas de temps :}
+\begin{itemize}
+  \item calculer le second membre $\mathbf{b}^n = \mathbf{U}^n + \Delta t\,F(\mathbf{U}^n)$
+  \item résoudre le système linéaire $(I - \Delta t\,A_{2D})\,\mathbf{U}^{n+1} = \mathbf{b}^n$
+  \item pour les grandes grilles : utiliser la méthode \textbf{ADI de Peaceman-Rachford}
+        qui décompose le système 2D en systèmes 1D tridiagonaux
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Euler Implicite — Schéma numérique}
+
+\textbf{Système linéaire global :}
+\begin{equation}
+  \boxed{(I - \Delta t\,A_{2D})\,\mathbf{U}^{n+1} = \mathbf{U}^n + \Delta t\,F(\mathbf{U}^n)}
+\end{equation}
+
+\bigskip
+
+\textbf{Méthode ADI de Peaceman-Rachford :}
+
+\medskip
+
+Demi-pas 1 — implicite en $x$, explicite en $y$ :
+\begin{equation}
+  \left(I - \tfrac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}
+  = \left(I + \tfrac{\Delta t}{2}D\,A_y\right)\mathbf{U}^n + \Delta t\,F(\mathbf{U}^n)
+\end{equation}
+
+Demi-pas 2 — implicite en $y$, explicite en $x$ :
+\begin{equation}
+  \left(I - \tfrac{\Delta t}{2}D\,A_y\right)\mathbf{U}^{n+1}
+  = \left(I + \tfrac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}
+\end{equation}
+
+\medskip
+
+\begin{itemize}
+  \item chaque demi-pas réduit à $N_y{+}1$ (resp. $N_x{+}1$) systèmes tridiagonaux 1D
+  \item coût total par pas : $O(N_x N_y)$ au lieu de $O((N_x N_y)^{1{,}5})$
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Euler Implicite — Stabilité et convergence}
+
+\textbf{Facteur d'amplification} — mode de Fourier $z = \Delta t\,\xi_{k_1,k_2} \leq 0$ :
+\begin{equation}
+  \rho = \frac{1}{1 - z} = \frac{1}{1 + |\Delta t\,\xi_{k_1,k_2}|} \in (0,1]
+  \qquad \forall\, \mu > 0.
+\end{equation}
+
+\bigskip
+
+\begin{itemize}
+  \item \textbf{inconditionnellement stable} — aucune contrainte sur $\Delta t$
+  \item ordre 1 en temps, ordre 2 en espace — erreur globale $O(\Delta t + h^2)$
+  \item matrice $(I - \Delta t\,A_{2D})$ symétrique définie positive — système
+        toujours inversible
+  \item avec réaction explicite ($\lambda = f'(u^*)$) :
+  \begin{equation}
+    \rho = \frac{1 + \Delta t\,\lambda}{1 - \Delta t\,\xi_{k_1,k_2}}
+  \end{equation}
+  stabilité maintenue aux équilibres stables ($\lambda < 0$)
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Adams-Bashforth 2 — Description de l'algorithme}
+
+Schéma \textbf{multipass explicite} d'ordre 2. On approche l'intégrale exacte
+$\mathbf{U}^{n+1} - \mathbf{U}^n = \int_{t^n}^{t^{n+1}} G(\mathbf{U})\,dt$
+par interpolation de Lagrange sur deux niveaux passés.
+
+\bigskip
+
+\textbf{Principe :}
+\begin{itemize}
+  \item interpoler $G$ sur $(t^{n-1}, G^{n-1})$ et $(t^n, G^n)$
+        par un polynôme de degré 1
+  \item intégrer exactement ce polynôme sur $[t^n, t^{n+1}]$
+        $\Rightarrow$ coefficients $\tfrac{3}{2}$ et $-\tfrac{1}{2}$
+  \item réutiliser $G^n$ au pas suivant comme $G^{n-1}$ — un seul calcul de $G$ par pas
+\end{itemize}
+
+\bigskip
+
+\textbf{Initialisation :}
+\begin{itemize}
+  \item $\mathbf{U}^0$ : condition initiale
+  \item $\mathbf{U}^1$ : un pas d'Euler explicite
+        $\mathbf{U}^1 = \mathbf{U}^0 + \Delta t\,G(\mathbf{U}^0)$
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Adams-Bashforth 2 — Schéma numérique}
+
+\textbf{Schéma AB2 en chaque point $(i,j)$ :}
+\begin{equation}
+  \boxed{u_{i,j}^{n+1} = u_{i,j}^n
+    + \Delta t\!\left(\frac{3}{2}\,G_{i,j}^n - \frac{1}{2}\,G_{i,j}^{n-1}\right)}
+\end{equation}
+
+avec le flux total :
+\begin{equation}
+  G_{i,j}^n = D\!\left(
+    \frac{u_{i+1,j}^n - 2u_{i,j}^n + u_{i-1,j}^n}{(\Delta x)^2}
+  + \frac{u_{i,j+1}^n - 2u_{i,j}^n + u_{i,j-1}^n}{(\Delta y)^2}
+  \right) + f(u_{i,j}^n)
+\end{equation}
+
+\bigskip
+
+\textbf{Organisation mémoire :}
+\begin{itemize}
+  \item stocker $G^{n-1}$ et $G^n$ entre deux pas consécutifs
+  \item à chaque pas : calculer $\mathbf{U}^{n+1}$, puis mettre à jour
+        $G^{n-1} \leftarrow G^n$, $G^n \leftarrow G(\mathbf{U}^{n+1})$
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Adams-Bashforth 2 — Stabilité et convergence}
+
+\textbf{Polynôme caractéristique} — mode $z = \Delta t\,\xi_{k_1,k_2} \leq 0$ :
+\begin{equation}
+  \zeta^2 - \left(1 + \frac{3}{2}z\right)\zeta + \frac{z}{2} = 0
+\end{equation}
+
+\bigskip
+
+\textbf{Condition de stabilité CFL en 2D} — région $z \in [-1, 0]$ :
+\begin{equation}
+  \Delta t \cdot \frac{8D}{h^2} \leq 1
+  \qquad \Longrightarrow \qquad
+  \boxed{\mu = \frac{D\,\Delta t}{h^2} \leq \frac{1}{8}}
+\end{equation}
+
+\bigskip
+
+\begin{itemize}
+  \item ordre 2 en temps, ordre 2 en espace — erreur globale $O((\Delta t)^2 + h^2)$
+  \item CFL \textbf{deux fois plus restrictive} qu'en 1D ($\mu \leq \tfrac{1}{4}$)
+  \item CFL \textbf{quatre fois plus restrictive} qu'Euler explicite en 1D
+  \item un seul calcul de $G$ par pas — coût $O(N_x N_y)$
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Adams-Moulton 2 — Description de l'algorithme}
+
+Schéma \textbf{semi-implicite} d'ordre 2, basé sur la règle des trapèzes.
+Même stratégie qu'Euler implicite : diffusion implicite, réaction explicite.
+
+\bigskip
+
+\textbf{Principe :}
+\begin{itemize}
+  \item approximer $\int_{t^n}^{t^{n+1}} G\,dt$ par la règle des trapèzes
+  \item traiter $A_{2D}\mathbf{U}$ implicitement aux deux instants $t^n$ et $t^{n+1}$
+  \item approximer la réaction explicitement par $2F(\mathbf{U}^n)$
+        pour éviter toute résolution non linéaire
+\end{itemize}
+
+\bigskip
+
+\textbf{Résolution par ADI de Peaceman-Rachford :}
+\begin{itemize}
+  \item demi-pas 1 : implicite en $x$, explicite en $y$
+  \item demi-pas 2 : implicite en $y$, explicite en $x$
+  \item chaque demi-pas réduit à des systèmes tridiagonaux 1D
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Adams-Moulton 2 — Schéma numérique}
+
+\textbf{Système linéaire global :}
+\begin{equation}
+  \boxed{\left(I - \frac{\Delta t}{2}A_{2D}\right)\mathbf{U}^{n+1}
+  = \mathbf{U}^n + \frac{\Delta t}{2}\!\left(A_{2D}\mathbf{U}^n + 2F(\mathbf{U}^n)\right)}
+\end{equation}
+
+\bigskip
+
+\textbf{Décomposition ADI :}
+
+\medskip
+
+Demi-pas 1 — implicite en $x$ :
+\begin{equation}
+  \left(I - \tfrac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}
+  = \left(I + \tfrac{\Delta t}{2}D\,A_y\right)\mathbf{U}^n + \Delta t\,F(\mathbf{U}^n)
+\end{equation}
+
+Demi-pas 2 — implicite en $y$ :
+\begin{equation}
+  \left(I - \tfrac{\Delta t}{2}D\,A_y\right)\mathbf{U}^{n+1}
+  = \left(I + \tfrac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}
+\end{equation}
+
+\end{frame}
+
+\begin{frame}{Adams-Moulton 2 — Stabilité et convergence}
+
+\textbf{Facteur d'amplification} — $z = \Delta t\,\xi_{k_1,k_2} \leq 0$ :
+\begin{equation}
+  \zeta = \frac{1 + z/2}{1 - z/2}
+\end{equation}
+
+\textbf{Démonstration d'A-stabilité :}
+\begin{equation}
+  (1 - z/2)^2 - (1 + z/2)^2 = -2z \geq 0 \quad \text{pour } z \leq 0
+  \quad \Longrightarrow \quad |\zeta| \leq 1 \quad \forall\, z \leq 0.
+\end{equation}
+
+\bigskip
+
+\begin{itemize}
+  \item \textbf{inconditionnellement stable} (A-stable) — aucune contrainte sur $\Delta t$
+  \item ordre 2 en temps, ordre 2 en espace — erreur globale $O((\Delta t)^2 + h^2)$
+  \item $|\zeta| < 1$ strictement pour $z < 0$ — propriété plus forte que la stabilité
+        sur l'axe réel négatif
+  \item avec l'ADI : coût $O(N_x N_y)$ par pas — \textbf{meilleur compromis ordre/coût}
+        pour les grandes grilles 2D
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Comparaison des quatre schémas en 2D}
+
+\begin{tabular}{@{}lllll@{}}
+  \toprule
+  Méthode & Type & Ordre & CFL 2D ($\mu$) & Coût/pas \\
+  \midrule
+  RK4         & explicite & 4 & $\leq 0{,}349$      & $4 \times O(N^2)$ \\[4pt]
+  Euler impl. & implicite & 1 & aucune              & $O(N^2)$ (ADI) \\[4pt]
+  AB2         & explicite & 2 & $\leq \frac{1}{8}$  & $1 \times O(N^2)$ \\[4pt]
+  AM2 + ADI   & implicite & 2 & aucune              & $O(N^2)$ (ADI) \\
+  \bottomrule
+\end{tabular}
+
+\bigskip
+
+\textbf{Points clés :}
+
+\begin{itemize}
+  \item les conditions CFL explicites en 2D sont exactement \textbf{deux fois plus
+        restrictives} qu'en 1D, en raison du facteur $|\lambda_{\max}^{2D}| = 2\,|\lambda_{\max}^{1D}|$
+  \item AB2 est le schéma explicite le plus contraignant ($\mu \leq 1/8$) —
+        quatre fois plus restrictif qu'Euler explicite en 1D
+  \item Euler implicite et AM2 sont inconditionnellement stables ;
+        AM2 est préférable car d'ordre 2
+  \item \textbf{AM2 + ADI} offre le meilleur compromis :
+        ordre 2, A-stable, coût $O(N^2)$ par pas
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Le criquet pèlerin -- Un bistable naturel}
+  \framesubtitle{\textit{Schistocerca gregaria} dans les plaines sahéliennes}
+
+\textbf{Pourquoi ce cas d'étude ?}\\[0.4em]
+      Le criquet pèlerin est l'un des rares organismes
+      qui exhibe naturellement une \textbf{bistabilité dure}~:
+      il existe sous \textbf{deux formes biologiquement distinctes}.
+
+      \medskip
+      \begin{itemize}
+          \item Phase solitaire \quad $u \approx 0$ \\
+        Individus discrets, verts, non migrateurs.\\
+        Impact agricole \textbf{négligeable}.
+        \item Phase grégaire \quad $u \approx 1$ \\
+         Essaims de milliards d'individus, jaunes et noirs,\\
+        migrant sur \textbf{des milliers de km}.\\
+        Destruction totale des cultures en quelques heures.
+      \end{itemize}
+
+      \vspace{0.3em}
+      \begin{exampleblock}{Seuil de grégarisation \quad $u = a$}
+        En dessous~: retour à $u=0$. Au dessus~: bascule vers $u=1$.\\
+        $\Rightarrow$ exactement un \textbf{équilibre instable}.
+      \end{exampleblock}
+  
+\end{frame}
+
+\section{Simulation et résultats}
+\framewithtitle{Simulation et résultats}
+
+
+
+\begin{frame}{Paramètres de la simulation}
+  \begin{itemize}
+    \item Domaine spatial : $[0,L_x]\times[0,L_y]$ avec $L_x = L_y = 60.0$.
+    \item Grille : $N_x = N_y = 80$, soit $81\times81$ points.
+    \item Espacement spatial : $\Delta x = \Delta y = 60/80 = 0.75$.
+    \item Paramètres physiques :
+      \begin{itemize}
+        \item Diffusion $D = 1.0$,
+        \item Seuil $a = 0.25$,
+        \item Temps final $T = 20.0$.
+      \end{itemize}
+    \item Conditions initiales principales étudiées :
+      \begin{itemize}
+        \item front plan vertical,
+        \item onde circulaire,
+        \item front plan perturbé.
+      \end{itemize}
+    \item Vitesse théorique du front :
+      $c^* = \sqrt{2D}\,(\tfrac12 - a) \approx 0.3536$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Schémas numériques comparés}
+  \begin{itemize}
+    \item RK4 : Runge-Kutta 4 explicit.
+    \item EI : Euler implicite semi-implicite.
+    \item ADI : Peaceman-Rachford semi-implicite avec résolutions 1D.
+    \item AB2 : Adams-Bashforth 2 explicite multi-pas.
+    \item AM2 : IMEX Crank-Nicolson semi-implicite.
+  \end{itemize}
+  \begin{itemize}
+    \item Schémas explicites nécessitent un petit pas temporel $\Delta t$.
+    \item Schémas semi-implicites permettent un pas plus grand pour stabiliser la diffusion.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Comparaison des schémas à $t \approx 20.0$}
+  \centering
+  \includegraphics[width=0.95\textwidth]{img/comparaison_schemas_t_20.00.png}
+  \caption{Distribution de $u(x,y)$ pour chaque schéma au temps final.}
+\end{frame}
+
+\begin{frame}{Interprétation : comparaison des schémas}
+  \begin{itemize}
+    \item Tous les schémas capturent la propagation d'un front entre $u\approx1$ et $u\approx0$.
+    \item Les schémas implicites montrent une meilleure stabilité globale pour les grandes étapes temporelles.
+    \item Le schéma RK4 propose une solution détaillée et peut servir de référence de haute précision.
+    \item Les différences observées proviennent du traitement de la diffusion et du terme non-linéaire.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Suivi du front et vitesse numérique}
+  \centering
+  \includegraphics[width=0.95\textwidth]{img/front_tracking.png}
+  \captionof{Position du front et vitesse numérique comparée à $c^*$.}
+\end{frame}
+
+\begin{frame}{Interprétation : suivi du front}
+  \begin{itemize}
+    \item La position du front évolue linéairement avec le temps, en accord avec l'hypothèse de propagation de type travelling wave.
+    \item La droite théorique $x = L_x/2 + c^* t$ sert de référence de vitesse.
+    \item Les schémas explicites et semi-implicites restent proches de la vitesse théorique, ce qui valide la simulation.
+    \item Les fluctuations numériques sont plus visibles sur la vitesse calculée par différences finies, en particulier pour AB2 et ADI.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Profil 3D final du champ $u$}
+  \centering
+  \includegraphics[width=0.75\textwidth]{img/surface_3d_RK4.png}
+  \captionof{figure}{Surface 3D du profil final $u(x,y)$ pour le schéma RK4.}
+\end{frame}
+
+\begin{frame}{Interprétation : surface 3D}
+  \begin{itemize}
+    \item Le profil final montre un front net entre les zones à $u\approx1$ et $u\approx0$.
+    \item L'utilisation d'une grille régulière en 2D met en évidence la symétrie de la propagation.
+    \item L'aspect 3D facilite l'observation du lissage dû à la diffusion et du maintien de la forme du front.
+  \end{itemize}
+\end{frame}
+
+\end{document}

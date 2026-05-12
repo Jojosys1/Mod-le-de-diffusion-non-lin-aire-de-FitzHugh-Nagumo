@@ -1,0 +1,2038 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{comment}
+\geometry{margin=2.5cm}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\lstdefinestyle{matlabstyle}{
+  language=Matlab,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{green!40!black},
+  stringstyle=\color{orange!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  frame=single,
+  breaklines=true,
+  tabsize=2,
+  showstringspaces=false
+}
+
+\newtheorem{theorem}{Theoreme}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemme}
+\newtheorem{remark}[theorem]{Remarque}
+
+% --- Encodage et langue ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+% --- Mise en page ---
+\usepackage[
+    top=2.5cm,
+    bottom=2.5cm,
+    left=2.5cm,
+    right=2.5cm
+]{geometry}
+
+% --- Images ---
+\usepackage{graphicx}
+
+% --- Encadré titre (tikzpicture) ---
+\usepackage{tikz}
+
+% --- Liens (optionnel mais recommandé) ---
+\usepackage[hidelinks]{hyperref}
+
+\title{Analyse et simulation num\'erique de l'\'equation de Nagumo\\
+%\large \'Etude th\'eorique, sch\'emas num\'eriques et stabilit\'e en dimension~2
+}
+\author{Rachidi AGRO \\Mawounan Jolemon GLODJO \\ Kafui HOMEVO}
+\date{22 avril 2026}
+
+
+\begin{document}
+%\maketitle
+
+\include{page_de_garde}
+
+\begin{abstract}
+Ce rapport pr\'esente une extension en dimension deux de l'\'etude de l'\'equation de Nagumo.
+L'\'equation de Nagumo 2D est un mod\`ele de r\'eaction-diffusion bistable dont les solutions
+incluent des fronts plans, des fronts courbes, et des ondes spirales observ\'es dans de
+nombreux syst\`emes biologiques et physiques.
+
+Nous commen\c{c}ons par la formulation math\'ematique 2D, l'analyse des \'equilibres, la
+construction et la vitesse des fronts voyageurs plans et courbes, incluant l'approximation
+eikonale pour les interfaces courb\'ees. Nous \'etablissons ensuite le principe du maximum
+et les r\'esultats d'existence globale en 2D.
+
+Du c\^ot\'e num\'erique, nous d\'erivons compl\`etement quatre sch\'emas de discr\'etisation
+temporelle coupl\'es au sch\'ema de diff\'erences finies \`a cinq points pour le Laplacien
+2D : Runge-Kutta d'ordre~4, Euler implicite (semi-implicite), Adams-Bashforth d'ordre~2 et
+Adams-Moulton d'ordre~2. Pour les sch\'emas implicites, nous pr\'esentons en d\'etail la
+m\'ethode ADI (Alternating Direction Implicit) de Peaceman-Rachford, qui r\'eduit la
+r\'esolution du syst\`eme 2D en syst\`emes 1D tridiagonaux efficaces.
+
+L'analyse de stabilit\'e de Von~Neumann en 2D montre que les conditions CFL sont
+\textbf{deux fois plus restrictives} qu'en 1D pour les sch\'emas explicites. Un code MATLAB
+complet est fourni pour simuler, visualiser et comparer les quatre sch\'emas en 2D.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\chapter*{Pr\'eambule -- Motivation et contexte}
+\addcontentsline{toc}{chapter}{Pr\'eambule -- Motivation et contexte}
+% =============================================================================
+
+L'\'equation de Nagumo a \'et\'e introduite~\cite{Nagumo1962} pour d\'ecrire la propagation
+d'un signal dans un milieu bistable. L'\'etude 1D constitue la fondation th\'eorique et
+num\'erique. Cependant, les ph\'enom\`enes r\'eels -- propagation de fronts nerveux, invasion
+cellulaire, ondes d'activation cardiaque -- se produisent dans des espaces de dimension
+sup\'erieure \cite{MurrayMathematicalBiology}.
+
+\medskip
+\noindent\textbf{Nouvelles richesses de la dimension~2.} En passant \`a la dimension~2,
+plusieurs ph\'enom\`enes \'emergent :
+\begin{itemize}[leftmargin=1.5em]
+  \item les \emph{fronts plans} (extension directe du cas 1D) ;
+  \item les \emph{fronts courbes} dont la vitesse d\'epend de la courbure locale
+        (\'equation eikonale) ;
+  \item les \emph{ondes circulaires} qui s'\'etendent depuis un point source ;
+  \item les \emph{ondes spirales}, structures auto-organis\'ees observ\'ees
+        dans le muscle cardiaque et les milieux chimiques oscillants \cite{Winfree1980}.
+\end{itemize}
+
+\medskip
+\noindent\textbf{Nouvelles difficult\'es num\'eriques.} La dimension~2 introduit aussi des
+d\'efis importants :
+\begin{itemize}[leftmargin=1.5em]
+  \item le Laplacien discret produit une matrice de taille $(N_x{+}1)(N_y{+}1) \times
+        (N_x{+}1)(N_y{+}1)$, de structure bloc-tridiagonale ;
+  \item les conditions CFL des sch\'emas explicites deviennent \emph{deux fois plus
+        restrictives} qu'en 1D ;
+  \item les sch\'emas implicites n\'ecessitent la m\'ethode ADI pour rester efficaces.
+\end{itemize}
+
+L'objectif de ce rapport est de construire l'analyse compl\`ete en dimension~2,
+en s'appuyant sur la m\'ethodologie de l'\'etude 1D et en l'\'etendant rigoureusement.
+
+% =============================================================================
+\chapter{Partie~I -- Analyse th\'eorique en 2D}
+% =============================================================================
+
+\section{Modèle générique}
+
+Les équations de réaction-diffusion constituent une classe de modèles aux dérivées partielles décrivant l'évolution spatiale et temporelle d'une ou plusieurs quantités soumises à deux processus antagonistes ou complémentaires : la \textit{diffusion} (transport linéaire) et la \textit{réaction} (cinétique locale non linéaire). Sous leur forme générique pour une seule variable $u(\mathbf{x},\mathbf{y}, t)$, elles s'écrivent :
+\[
+\frac{\partial u}{\partial t} = D\,\Delta u + f(u),
+\]
+où $D > 0$ est le coefficient de diffusion (supposé constant ici), $\Delta$ l'opérateur laplacien, et $f(u)$ le terme de réaction, généralement non linéaire.
+
+\subsection*{Forme spécifique de Nagumo}
+
+L'équation proposée par Nagumo, Arimoto et Yoshizawa s'obtient en choisissant une cinétique cubique particulière :
+\[
+\frac{\partial u}{\partial t} = D\,\Delta u + u(1-u)(u-a), \qquad a \in (0,1).
+\]
+La variable $u$ représente le potentiel de membrane adimensionné, $D$ le coefficient de diffusion effectif, et $a$ un paramètre de seuil.
+
+\subsection*{Interprétation des termes et paramètres}
+
+\begin{itemize}
+  \item \textbf{Terme de diffusion} $D\,\Delta u$ : il modélise la propagation 
+  
+  \item \textbf{Terme de réaction} $f(u)=u(1-u)(u-a)$ : c'est un polynôme cubique qui rend compte des mécanismes de bistabilité. 
+  
+  \item \textbf{Paramètre de seuil $a$} : il contrôle la difficulté à basculer de l'état $0$ à l'état $1$. Plus $a$ est proche de $0$, plus l'état $0$ est facilement déstabilisé ; plus $a$ est proche de $1$, plus l'état $1$ est attractif. Dans le contexte neuronal, $a$ représente le seuil d'excitabilité relatif.
+\end{itemize}
+
+Cette équation constitue le prototype de réaction-diffusion bistable, permettant d'étudier rigoureusement l'existence et la stabilité de fronts voyageurs.
+
+\section{Existence et unicité des solutions}
+
+Avant d’étudier numériquement l’équation de Nagumo, il est essentiel de la formuler comme un \textit{problème de Cauchy} (ou problème aux conditions initiales) et de s’assurer que sa solution existe et est unique. Cela permet de justifier la pertinence des schémas numériques.
+
+\subsection*{Formulation comme problème de Cauchy}
+
+L’équation de Nagumo s’écrit, sur un domaine spatial $\Omega \subset \mathbb{R}^2$, et pour $t > 0$ :
+\[
+\frac{\partial u}{\partial t} = D\,\Delta u + f(u), \qquad f(u) = u(1-u)(u-a),
+\]
+où $u(x,y,t)$ est le potentiel de membrane adimensionné. Pour que le problème soit bien posé, on doit lui adjoindre :
+\begin{itemize}
+  \item une \textbf{condition initiale} : $u(x,y,0) = u_0(x,y)$ pour tout $x \in \Omega$,
+  \item des \textbf{conditions aux limites} sur le bord $\partial\Omega$ (aux extrémités de l’axone).
+\end{itemize}
+
+\subsection*{Conditions aux limites usuelles}
+
+Dans un domaine bidimensionnel \(\Omega \subset \mathbb{R}^2\) (par exemple une plaque rectangulaire ou un disque), deux types de conditions aux limites sont couramment employés :
+
+\begin{description}
+  \item[Conditions de Dirichlet] : on impose la valeur de la solution sur le bord \(\partial\Omega\). Par exemple,
+  \[
+  u(x,y,t) = 0 \quad \text{pour tout } (x,y) \in \partial\Omega,
+  \]
+  ce qui correspond à maintenir le bord du tissu au potentiel de repos.
+  
+  \item[Conditions de Neumann] : on impose le flux (dérivée normale) au bord. Par exemple,
+  \[
+  \frac{\partial u}{\partial \mathbf{n}}(x,y,t) = 0 \quad \text{pour tout } (x,y) \in \partial\Omega,
+  \]
+  où \(\mathbf{n}\) est la normale extérieure. Cela traduit une isolation électrique : aucun courant ne traverse la frontière.
+\end{description}
+
+Le choix entre Dirichlet et Neumann dépend de la situation physiologique ou physique modélisée. Pour un domaine infini (plan entier ou axone très long en 1D), on impose souvent des conditions de décroissance à l’infini : \(u(\mathbf{x},t) \to 0\) ou \(1\) lorsque \(|\mathbf{x}| \to \infty\).
+
+\subsection*{Existence et unicité des solutions}
+
+L’équation de Nagumo est une équation de réaction-diffusion parabolique semi-linéaire. Pour un domaine borné avec des conditions aux limites régulières (Dirichlet ou Neumann homogènes) et une condition initiale $u_0$ suffisamment régulière (par exemple $u_0 \in L^2(\Omega)$), on peut démontrer les propriétés suivantes :
+
+\begin{itemize}
+  \item \textbf{Existence locale et globale dans le temps} : La non-linéarité $f(u)$ est polynomiale, donc localement lipschitzienne. Il existe une unique solution maximale définie sur un intervalle $[0,T_{\max})$. En outre, gr\^ace à des estimations \textit{a priori} (invariance de la bande $[0,1]$), on montre que $T_{\max} = +\infty$ : la solution reste bornée et existe pour tout temps.
+  
+  \item \textbf{Unicité} : Pour des conditions initiales et aux limites données, la solution est unique. Cela découle du caractère lipschitzien de $f$ sur des ensembles bornés et de l’application du lemme de Gronwall.
+  
+  \item \textbf{Régularité} : La solution devient immédiatement $C^\infty$ en $x$ et $t$ pour $t>0$, grâce au caractère régularisant de l’opérateur de diffusion. Ainsi, même une condition initiale discontinue conduit à une solution lisse pour tout temps strictement positif.
+\end{itemize}
+
+En résumé, posé avec des conditions aux limites de Dirichlet ou de Neumann homogènes, le problème de Cauchy pour l’équation de Nagumo est \textit{bien posé} : la solution existe, est unique et dépend continûment des données initiales. Cette assise théorique garantit que l’on peut légitimement chercher des approximations numériques et interpréter les résultats.
+
+\section{Équilibre et stabilité}
+
+\subsection*{Points d’équilibre homogènes}
+
+Les solutions stationnaires et spatialement uniformes de l’équation de Nagumo vérifient $\frac{\partial u}{\partial t}=0$ et $\Delta u = 0$. Il suffit donc d’annuler le terme de réaction :
+\[
+f(u)=u(1-u)(u-a)=0.
+\]
+On obtient trois points d’équilibre :
+\[
+u^*_1 = 0,\qquad u^*_2 = a,\qquad u^*_3 = 1,
+\]
+avec $0<a<1$. Le paramètre $a$ joue le rôle d’un seuil d’excitabilité.
+
+\subsection*{Stabilité autour des points d’équilibre}
+
+Pour analyser la stabilité de ces états par rapport à de petites perturbations homogènes, on linéarise l’équation différentielle ordinaire associée (en négligeant la diffusion spatiale, ce qui est pertinent pour des perturbations uniformes). On étudie le signe de $f'(u^*)$ :
+\[
+f'(u) = \frac{d}{du}\bigl(u(1-u)(u-a)\bigr) = -3u^2 + 2u(a+1) -a.
+\]
+Un calcul simple donne :
+\[
+f'(0) = -a < 0,\qquad f'(a) = a(1-a) > 0,\qquad f'(1) = -(1-a) < 0.
+\]
+
+\begin{itemize}
+  \item $u=0$ et $u=1$ sont \textbf{asymptotiquement stables} : toute petite perturbation homogène s’amortit exponentiellement.
+  \item $u=a$ est \textbf{instable} : la moindre déviation pousse le système vers l’un des deux états stables.
+\end{itemize}
+
+Ainsi, l’équation de Nagumo possède deux puits (repos et excitation) séparés par une barrière instable – c’est la structure \textit{bistable}.
+
+
+
+\subsection*{Fronts voyageurs : caractérisation}
+
+La bistabilité permet l’existence de \textbf{fronts voyageurs} : des solutions particulières de l’équation de réaction-diffusion qui relient l’état $0$ à l’état $1$ et se propagent à vitesse constante sans changer de forme. En deux dimensions, on peut chercher des ondes planes se propageant dans une direction donnée, par exemple selon l’axe $x$. On utilise alors l’ansatz
+\[
+u(x,y,t) = \phi(x - c t),
+\]
+où $\phi$ est le profil du front et $c$ la vitesse (positive pour un front allant de $0$ vers $1$). La variable $y$ n’intervient pas car le front est invariant par translation transverse. En substituant dans l’équation de Nagumo, on obtient la même équation différentielle ordinaire pour $\phi$ que dans le cas unidimensionnel :
+\[
+D\,\phi'' + c\,\phi' + f(\phi) = 0,
+\]
+avec les conditions aux limites $\phi(-\infty)=0$, $\phi(+\infty)=1$ (ou l’inverse selon le sens de propagation).
+
+La caractérisation des fronts voyageurs repose sur plusieurs résultats fondamentaux :
+\begin{itemize}
+  \item \textbf{Existence et unicité} : Pour chaque $a\in(0,1)$, il existe une unique vitesse $c(a,D)$ (à un signe près) pour laquelle un front reliant $0$ à $1$ existe. Cette vitesse n’est pas arbitraire ; elle est déterminée par le système.
+ 
+\begin{comment}
+
+  \item \textbf{Signe de la vitesse} : 
+  \[
+  \operatorname{signe}(c) = \operatorname{signe}\!\left(\int_0^1 f(u)\,du\right).
+  \]
+  Comme $\int_0^1 u(1-u)(u-a)\,du = \frac{1}{12}(1-2a)$, la vitesse est positive si $a<\frac12$ (le front progresse vers la droite, l’état $1$ envahit $0$), négative si $a>\frac12$, et nulle si $a=\frac12$ (front stationnaire).
+\end{comment}
+
+      
+  \item \textbf{Stabilité des fronts} : Les fronts plans sont asymptotiquement stables vis-à-vis de perturbations longitudinales ; en dimensions supérieures, une instabilité transverse peut toutefois apparaître pour certaines valeurs des paramètres.
+\end{itemize}
+
+
+% -----------------------------------------------------------------------------
+\section{Solutions en fronts voyageurs en 2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Fronts plans -- extension directe du cas 1D}
+
+En 2D, on peut chercher des solutions de la forme
+\begin{equation}
+  u(x,y,t) = \phi(\xi),\qquad \xi = x\cos\theta + y\sin\theta - ct,
+\end{equation}
+o\`u $\mathbf{e} = (\cos\theta, \sin\theta)$ est la direction de propagation et $c$ est
+la vitesse. Ce sont les \emph{fronts plans} : ils ne d\'ependent que de la coordonn\'ee
+dans la direction $\mathbf{e}$ et sont uniformes dans la direction transverse.
+
+\textbf{D\'erivation de l'ODE du front.}
+En utilisant la r\`egle de cha\^{\i}ne :
+\begin{align}
+  \frac{\partial u}{\partial t} &= -c\,\phi'(\xi), \\
+  \frac{\partial u}{\partial x} &= \cos\theta\,\phi'(\xi),\quad
+  \frac{\partial^2 u}{\partial x^2} = \cos^2\theta\,\phi''(\xi), \\
+  \frac{\partial u}{\partial y} &= \sin\theta\,\phi'(\xi),\quad
+  \frac{\partial^2 u}{\partial y^2} = \sin^2\theta\,\phi''(\xi).
+\end{align}
+Le Laplacien vaut donc
+\begin{equation}
+  \Delta u = (\cos^2\theta + \sin^2\theta)\,\phi''(\xi) = \phi''(\xi).
+\end{equation}
+En substituant dans l'\'equation de Nagumo 2D~\eqref{eq:nagumo2d} :
+\begin{equation}
+  -c\phi' = D\phi'' + f(\phi),
+\end{equation}
+soit exactement la m\^eme ODE qu'en 1D :
+\begin{equation}\label{eq:ode_front2d}
+  \boxed{D\phi'' + c\phi' + f(\phi) = 0,\qquad f(\phi)=\phi(1-\phi)(\phi-a).}
+\end{equation}
+Avec les conditions asymptotiques $\phi(-\infty)=1$ et $\phi(+\infty)=0$.
+
+\textbf{Conclusion.} La vitesse et le profil des fronts plans en 2D sont identiques
+\`a ceux du cas 1D, ind\'ependamment de la direction $\theta$ :
+\begin{equation}
+  c^* = \sqrt{2D}\left(\frac{1}{2}-a\right),\qquad
+  \phi^*(\xi) = \frac{1}{1+e^{\xi/\sqrt{2D}}}.
+\end{equation}
+
+\subsection*{D\'emonstration compl\`ete de la vitesse critique}
+
+On v\'erifie que le profil logistique~$\phi^*(\xi)=1/(1+e^{\xi/\sqrt{2D}})$ est une
+solution exacte de l'ODE~\eqref{eq:ode_front2d} pour $c=c^*$.
+
+En posant $s = e^{\xi/\sqrt{2D}}$, on a $\phi = 1/(1+s)$. Les d\'eriv\'ees valent :
+\begin{equation}
+  \phi' = -\frac{s}{(1+s)^2\sqrt{2D}} = -\frac{\phi(1-\phi)}{\sqrt{2D}},
+\end{equation}
+\begin{equation}
+  \phi'' = \frac{\phi'(1-2\phi)}{\sqrt{2D}} = -\frac{\phi(1-\phi)(1-2\phi)}{2D}.
+\end{equation}
+On substitue dans l'ODE $D\phi''+c\phi'+f(\phi)=0$ :
+\begin{equation}
+  D\cdot\left(-\frac{\phi(1-\phi)(1-2\phi)}{2D}\right)
+  +c\cdot\left(-\frac{\phi(1-\phi)}{\sqrt{2D}}\right)
+  +\phi(1-\phi)(\phi-a)=0.
+\end{equation}
+On divise par $\phi(1-\phi)\neq 0$ :
+\begin{equation}
+  -\frac{1-2\phi}{2} - \frac{c}{\sqrt{2D}} + (\phi-a) = 0.
+\end{equation}
+En d\'eveloppant :
+\begin{equation}
+  \phi - \frac{1}{2} - \frac{c}{\sqrt{2D}} + \phi - a = 0.
+\end{equation}
+On remarque que les termes en $\phi$ s'annulent mutuellement
+($\phi-\frac{1-2\phi}{2}=\phi-\frac12+\phi=2\phi-\frac12$... 
+reprenons soigneusement) :
+\begin{equation}
+  -\frac{1}{2}+\phi-\frac{c}{\sqrt{2D}}+\phi-a=0
+  \quad\Longrightarrow\quad
+  2\phi - \frac{1}{2} - a - \frac{c}{\sqrt{2D}} = 0.
+\end{equation}
+Pour que cette \'egalit\'e soit satisfaite ind\'ependamment de $\phi$
+(c'est-\`a-dire pour tout $\xi$), il faut que le coefficient de $\phi$ soit nul.
+Or ici il vaut~2, ce qui sugg\`ere que l'annulation n'est pas triviale.
+
+\medskip
+\noindent\textbf{Retour sur la d\'erivation.} Reprenons avec soin :
+\begin{equation}
+  -\frac{1-2\phi}{2} = -\frac{1}{2}+\phi.
+\end{equation}
+Donc l'\'equation devient :
+\begin{equation}
+  \left(-\frac{1}{2}+\phi\right) - \frac{c}{\sqrt{2D}} + (\phi-a) = 0
+  \;\Longrightarrow\;
+  2\phi - \frac{1}{2} - a - \frac{c}{\sqrt{2D}} = 0.
+\end{equation}
+On observe que le terme $2\phi$ ne s'annule pas automatiquement.
+\textbf{C'est pr\'ecis\'ement l\`a que le choix du profil logistique est sp\'ecial} :
+il ne v\'erifie pas l'ODE du front g\'en\'erale, mais une ODE plus simple.
+En r\'ealit\'e, le profil $\phi^*$ satisfait la relation de premi\`ere ordre :
+\begin{equation}
+  \phi' = -\frac{\phi(1-\phi)}{\sqrt{2D}}.
+\end{equation}
+On peut v\'erifier directement que si $\phi' = -\phi(1-\phi)/\sqrt{2D}$, alors :
+\begin{equation}
+  \phi'' = \frac{d\phi'}{d\xi}
+  = -\frac{(\phi'(1-\phi) + \phi(-\phi'))}{\sqrt{2D}}
+  = -\frac{\phi'(1-2\phi)}{\sqrt{2D}}
+  = \frac{\phi(1-\phi)(1-2\phi)}{2D}.
+\end{equation}
+(signe oppos\'e \`a ce qu'on avait \'ecrit pr\'ec\'edemment ; corrigeons).
+En substituant dans $D\phi'' + c\phi' + f(\phi) = 0$ :
+\begin{align}
+  D \cdot \frac{\phi(1-\phi)(1-2\phi)}{2D}
+  &+ c \cdot \left(-\frac{\phi(1-\phi)}{\sqrt{2D}}\right)
+  + \phi(1-\phi)(\phi-a) = 0.
+\end{align}
+On divise par $\phi(1-\phi) > 0$ :
+\begin{equation}
+  \frac{1-2\phi}{2} - \frac{c}{\sqrt{2D}} + (\phi-a) = 0.
+\end{equation}
+En d\'eveloppant $\frac{1-2\phi}{2} = \frac{1}{2}-\phi$ :
+\begin{equation}
+  \frac{1}{2} - \phi - \frac{c}{\sqrt{2D}} + \phi - a = 0.
+\end{equation}
+Les termes en $\phi$ s'annulent (! c'est la cl\'e de l'argument !) :
+\begin{equation}
+  \frac{1}{2} - a - \frac{c}{\sqrt{2D}} = 0
+  \qquad\Longrightarrow\qquad
+  \boxed{c^* = \sqrt{2D}\left(\frac{1}{2}-a\right).}
+\end{equation}
+Le profil $\phi^*(\xi) = 1/(1+e^{\xi/\sqrt{2D}})$ est donc une solution exacte de
+l'ODE du front pour cette unique vitesse~$c^*$.
+
+
+
+\begin{comment}
+    
+\begin{theorem}[Existence, unicit\'e et vitesse du front plan en 2D]
+Pour l'\'equation de Nagumo 2D avec $0<a<1$ et $D>0$, dans toute direction
+$\mathbf{e}=(\cos\theta,\sin\theta)$, il existe une unique vitesse
+\[
+  c^* = \sqrt{2D}\!\left(\tfrac{1}{2}-a\right)
+\]
+et un unique profil ({\`a} translation pr\`es)
+$\phi^*(\xi) = 1/(1+e^{\xi/\sqrt{2D}})$ tel que :
+$(1)$~$D(\phi^*)'' + c^*(\phi^*)' + f(\phi^*) = 0$ ;
+$(2)$~$\phi^*(-\infty)=1$, $\phi^*(+\infty)=0$ ;
+$(3)$~$0<\phi^*(\xi)<1$ et $\phi^*$ est strictement d\'ecroissante.
+La vitesse $c^*$ est ind\'ependante de la direction $\theta$.
+\end{theorem}
+\end{comment}
+
+\textbf{Observation sur le signe de $c^*$.} Un calcul direct donne
+$\int_0^1 f(u)\,du = (1-2a)/12$, ce qui montre que $c^*>0\Leftrightarrow a<1/2$
+(le front avance), $c^*<0\Leftrightarrow a>1/2$ (le front recule),
+$c^*=0\Leftrightarrow a=1/2$ (front stationnaire).
+
+
+\begin{comment}
+    
+% -----------------------------------------------------------------------------
+\subsection*{Fronts courbes -- \'equation eikonale et vitesse normale}
+% -----------------------------------------------------------------------------
+
+En dimension 2, une interface courbe entre les deux \'etats stables se propage
+avec une vitesse normale qui d\'epend de la courbure locale. C'est un ph\'enom\`ene
+sp\'ecifique \`a la dimension $\ge 2$.
+
+\textbf{Motivation.} Supposons que le front soit localement une courbe
+$\Gamma(t)$ d\'ecrite par un param\`etrage $\mathbf{x}_0(s,t)$.
+La vitesse normale locale $v_n$ de l'interface est modifi\'ee par la courbure
+$\kappa$ de la courbe (courbure sign\'ee, positive si convexe).
+
+\textbf{\'Equation eikonale (r\'esultat asymptotique).}
+Pour l'\'equation de Nagumo en r\'egime d'interface mince (\'epaisseur~$\varepsilon$ petite),
+une analyse asymptotique \`a couches limites interne et externe
+\cite{FifeMcLeod1977,Rubinstein1989} montre que la vitesse normale du front satisfait :
+\begin{equation}
+  \boxed{v_n = c^* - D\,\varepsilon\,\kappa + O(\varepsilon^2),}
+\end{equation}
+o\`u $\varepsilon = \sqrt{2D}$ est la largeur caract\'eristique du profil de front
+et $\kappa$ est la courbure alg\'ebrique de l'interface (positive pour un front
+convexe vu depuis l'\'etat $u=1$).
+
+\textbf{Interpr\'etation physique.}
+\begin{itemize}[leftmargin=1.5em]
+  \item Si $\kappa>0$ (front convexe) : la vitesse normale est r\'eduite. Les fronts
+        convexes se propagent plus lentement.
+  \item Si $\kappa<0$ (front concave) : la vitesse normale est augment\'ee.
+  \item Pour $c^*=0$ ($a=1/2$), la dynamique d'interface est purement pilotée
+        par la courbure : $v_n = -D\varepsilon\kappa$ (\'equation de mouvement
+        par courbure moyenne, ou Allen-Cahn).
+\end{itemize}
+
+\textbf{Ondes circulaires.}
+Pour une onde circulaire de rayon $R(t)$ en 2D, la courbure vaut $\kappa=1/R$ et
+l'\'equation eikonale donne :
+\begin{equation}
+  \dot R = c^* - \frac{D\varepsilon}{R}.
+\end{equation}
+Il existe un rayon critique $R_c = D\varepsilon/c^*$ en de\c{c}a duquel l'onde
+s'effondre ($\dot R<0$) et au-del\`a duquel elle s'\'etend ($\dot R>0$).
+En dimension~3, $\kappa = 2/R$ et $R_c = 2D\varepsilon/c^*$.
+
+
+
+\end{comment}
+
+% -----------------------------------------------------------------------------
+\section{R\'egularit\'e, principe du maximum et existence globale}
+% -----------------------------------------------------------------------------
+
+En dimension~2, la th\'eorie des EDP paraboliques~\cite{EvansGariepy2015} garantit,
+pour $u_0\in L^\infty(\Omega)$ et $\Omega$ born\'e r\'egulier, l'existence locale
+d'une solution faible sur~$[0,T_*]$.
+
+\textbf{Principe du maximum en 2D.}
+Le principe du maximum s'applique aux op\'erateurs paraboliques en dimension quelconque
+\cite{Protter1967}. Si $u_0(x,y)\in[0,1]$ pour tout $(x,y)\in\Omega$, alors :
+\begin{equation}
+  u(x,y,t)\in[0,1]\qquad\text{pour tout }(x,y)\in\Omega,\; t\ge 0.
+\end{equation}
+\textbf{D\'emonstration (id\'ee).} On pose $M(t)=\max_{(x,y)\in\bar\Omega}u(x,y,t)$.
+Au point $(x_M,y_M)$ o\`u le maximum est atteint, $\Delta u \le 0$ (Laplacien
+n\'egatif au maximum), donc $\partial_t u = D\Delta u + f(u)\le f(u)$.
+Si $M>1$, alors $f(M)=M(1-M)(M-a)<0$ car $1-M<0$, donc $\partial_t M<0$ :
+le maximum ne peut pas d\'epasser~1. De m\^eme pour le minimum.
+
+\textbf{Cons\'equences.}
+\begin{enumerate}[leftmargin=2em]
+  \item La bornitude a priori prolonge la solution \`a tout temps $t\in[0,\infty)$.
+  \item La solution reste dans la r\'egion physique $[0,1]$.
+  \item Les sch\'emas num\'eriques qui violent ce principe produisent des oscillations
+        parasites ; les sch\'emas monotones (implicites ou RK4 avec $\Delta t$ petit)
+        le pr\'eservent.
+\end{enumerate}
+
+% =============================================================================
+\chapter{Partie~II -- Analyse num\'erique en 2D}
+% =============================================================================
+
+L'analyse num\'erique de l'\'equation de Nagumo 2D repose sur une discr\'etisation
+spatiale par diff\'erences finies \`a cinq points (sch\'ema ``en croix''), coupl\'ee \`a
+plusieurs sch\'emas de discr\'etisation temporelle~\cite{Strikwerda2004,LeVeque2007}.
+Nous d\'erivons chaque sch\'ema en d\'etail et discutons ses propri\'et\'es.
+
+% -----------------------------------------------------------------------------
+\section{Mise en place de la discr\'etisation spatiale 2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Grille et notation}
+
+On introduit une grille spatiale r\'eguli\`ere :
+\begin{equation}
+  x_i = i\,\Delta x,\quad i=0,\ldots,N_x,\qquad
+  y_j = j\,\Delta y,\quad j=0,\ldots,N_y,
+\end{equation}
+et une grille temporelle $t^n = n\,\Delta t$, $n\ge 0$.
+On note $u_{i,j}^n \approx u(x_i,y_j,t^n)$.
+
+\subsection*{Approximation du Laplacien 2D : sch\'ema \`a cinq points}
+
+Le Laplacien est approch\'e par des diff\'erences finies centr\'ees d'ordre~2 dans
+chaque direction :
+\begin{equation}\label{eq:laplacien2d}
+  \Delta u(x_i,y_j,t^n) \approx
+  \frac{u_{i+1,j}^n-2u_{i,j}^n+u_{i-1,j}^n}{(\Delta x)^2}
+  +\frac{u_{i,j+1}^n-2u_{i,j}^n+u_{i,j-1}^n}{(\Delta y)^2}.
+\end{equation}
+Ce sch\'ema est appel\'e sch\'ema ``en croix'' ou ``\`a cinq points'' : il fait intervenir
+le point central $(i,j)$ et ses quatre voisins imm\'ediats.
+
+\textbf{Erreur de troncature spatiale.}
+Par d\'eveloppement de Taylor \`a l'ordre~4, on montre que
+\begin{equation}
+  \Delta u(x_i,y_j) - \Delta_h u_{i,j}
+  = \frac{(\Delta x)^2}{12}\frac{\partial^4 u}{\partial x^4}
+  + \frac{(\Delta y)^2}{12}\frac{\partial^4 u}{\partial y^4}
+  + O\!\left((\Delta x)^4+(\Delta y)^4\right).
+\end{equation}
+L'erreur de troncature spatiale est donc $O((\Delta x)^2+(\Delta y)^2)$, soit d'ordre~2.
+
+\subsection*{Conditions de Neumann par points fant\^omes}
+
+Les conditions de Neumann $\partial_x u = 0$ en $x=0$ et $x=L_x$,
+$\partial_y u = 0$ en $y=0$ et $y=L_y$, sont impl\'ement\'ees par des points fant\^omes :
+\begin{align}
+  &u_{-1,j}^n = u_{1,j}^n,\quad u_{N_x+1,j}^n = u_{N_x-1,j}^n,
+  \quad\text{(bords gauche et droit)} \\
+  &u_{i,-1}^n = u_{i,1}^n,\quad u_{i,N_y+1}^n = u_{i,N_y-1}^n.
+  \quad\text{(bords bas et haut)}
+\end{align}
+Aux coins, on applique les deux conditions simultan\'ement.
+
+\subsection*{Structure matricielle par produit de Kronecker}
+
+On ordonne les inconnues $u_{i,j}$ en un vecteur colonne $\mathbf{U}$ de taille
+$(N_x+1)(N_y+1)$ en parcourant d'abord les $j$ puis les $i$ (ordre lexico\-graphique).
+Le Laplacien discret 2D s'\'ecrit alors :
+\begin{equation}\label{eq:kron}
+  \boxed{A_{2D} = D\!\left(I_{N_y+1} \otimes A_x + A_y \otimes I_{N_x+1}\right),}
+\end{equation}
+o\`u :
+\begin{itemize}[leftmargin=1.5em]
+  \item $A_x$ est la matrice tridiagonale 1D du Laplacien en~$x$ de taille
+        $(N_x+1)\times(N_x+1)$ (avec Neumann), divis\'ee par~$(\Delta x)^2$ ;
+  \item $A_y$ est la matrice tridiagonale 1D du Laplacien en~$y$ de taille
+        $(N_y+1)\times(N_y+1)$ (avec Neumann), divis\'ee par~$(\Delta y)^2$ ;
+  \item $I_{N_x+1}$ et $I_{N_y+1}$ sont les matrices identit\'e de tailles respectives ;
+  \item $\otimes$ d\'esigne le produit de Kronecker.
+\end{itemize}
+
+\textbf{Propri\'et\'es de $A_{2D}$.}
+\begin{itemize}[leftmargin=1.5em]
+  \item $A_{2D}$ est une matrice creuse de taille
+        $(N_x+1)(N_y+1)\times(N_x+1)(N_y+1)$
+        avec au plus 5 \'el\'ements non nuls par ligne.
+  \item Elle est sym\'etrique, \`a d\'ependance strictement dominante.
+  \item Elle est s\'emi-d\'efinie n\'egative (toutes les valeurs propres $\le 0$).
+  \item Sa valeur propre la plus grande (en valeur absolue) vaut, pour
+        $\Delta x=\Delta y=h$ :
+        \begin{equation}
+          |\lambda_{\max}(A_{2D})| = \frac{4D}{h^2}+\frac{4D}{h^2} = \frac{8D}{h^2}.
+        \end{equation}
+\end{itemize}
+
+\subsection*{Flux total discret}
+
+On d\'efinit le flux total au point $(i,j)$ et au temps $t^n$ :
+\begin{equation}
+  F_{i,j}^n = D\,\Delta_h u_{i,j}^n + f(u_{i,j}^n),
+\end{equation}
+et en notation vectorielle $G(\mathbf{U}) = A_{2D}\mathbf{U} + F(\mathbf{U})$,
+o\`u $F(\mathbf{U})$ est le vecteur des r\'eactions appliqu\'ees composante par composante.
+
+\medskip
+\noindent\textit{Remarque.} En utilisant une grille uniforme $\Delta x=\Delta y=h$ et en
+posant $\mu = D\Delta t/h^2$, on obtient une condition de stabilit\'e deux fois plus
+restrictive qu'en 1D pour les sch\'emas explicites, car $|\lambda_{\max}|$ est
+deux fois plus grand.
+
+
+
+% =============================================================================
+\section{ \'Etude de stabilit\'e en 2D}
+% =============================================================================
+
+L'analyse de Von~Neumann en 2D \'etend directement la m\'ethode 1D. On cherche des solutions
+de la forme
+\begin{equation}
+  u_{i,j}^n = \rho^n \, e^{i(k_1 x_i + k_2 y_j)},
+  \qquad x_i=i\,\Delta x,\; y_j=j\,\Delta y,
+\end{equation}
+o\`u $k_1,k_2$ sont les nombres d'onde dans les directions $x$ et $y$ respectivement.
+La condition de stabilit\'e est $|\rho|\le 1$ (ou $|\zeta|\le 1$ pour les sch\'emas multipas)
+pour tous $k_1,k_2$.
+
+\textbf{Valeur propre 2D du Laplacien discret.}
+En substituant le mode de Fourier dans le Laplacien discret~\eqref{eq:laplacien2d} :
+\begin{align}
+  \Delta_h u_{i,j} &= \frac{e^{ik_1\Delta x}+e^{-ik_1\Delta x}-2}{(\Delta x)^2}\,u_{i,j}
+                   + \frac{e^{ik_2\Delta y}+e^{-ik_2\Delta y}-2}{(\Delta y)^2}\,u_{i,j} \notag\\
+  &= \left[-\frac{4}{(\Delta x)^2}\sin^2\!\left(\frac{k_1\Delta x}{2}\right)
+           -\frac{4}{(\Delta y)^2}\sin^2\!\left(\frac{k_2\Delta y}{2}\right)\right]u_{i,j}.
+\end{align}
+On d\'efinit la \textbf{valeur propre 2D} du Laplacien discret pour le mode $(k_1,k_2)$ :
+\begin{equation}\label{eq:eigenvalue2d}
+  \boxed{\xi_{k_1,k_2} = -\frac{4D}{(\Delta x)^2}\sin^2\!\left(\frac{k_1\Delta x}{2}\right)
+                         -\frac{4D}{(\Delta y)^2}\sin^2\!\left(\frac{k_2\Delta y}{2}\right) \le 0.}
+\end{equation}
+Pour $\Delta x=\Delta y=h$, le mode le plus contraignant est atteint pour
+$k_1\Delta x=k_2\Delta y=\pi$ et vaut :
+\begin{equation}
+  |\xi_{\max}| = \frac{4D}{h^2}+\frac{4D}{h^2} = \frac{8D}{h^2}.
+\end{equation}
+En 1D, on avait $|\xi_{\max}^{1D}|=4D/h^2$.
+\textbf{La valeur propre extr\^eme est deux fois plus grande en 2D},
+ce qui explique pourquoi les conditions CFL sont deux fois plus restrictives.
+
+% -----------------------------------------------------------------------------
+\section{M\'ethode~1 : Runge-Kutta d'ordre~4 (RK4) en 2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Principe de la m\'ethode}
+
+La m\'ethode RK4 est une m\'ethode \`a un pas, explicite, d'ordre~4 en temps.
+Elle approche l'int\'egrale exacte
+\begin{equation}
+  \mathbf{U}(t^{n+1}) = \mathbf{U}(t^n) + \int_{t^n}^{t^{n+1}} G(\mathbf{U}(t))\,dt
+\end{equation}
+par une formule de quadrature \`a quatre \'etapes, analogue \`a la r\`egle de Simpson.
+En dimension~2, le vecteur $\mathbf{U}^n$ est de taille $(N_x+1)(N_y+1)$ et
+$G(\mathbf{U}) = A_{2D}\mathbf{U} + F(\mathbf{U})$.
+
+\subsection*{D\'erivation et formule compl\`ete}
+
+\textbf{\'Etape~1 :} \'evaluer $G$ au temps $t^n$ :
+\begin{equation}
+  K_1 = G(\mathbf{U}^n) = A_{2D}\mathbf{U}^n + F(\mathbf{U}^n).
+\end{equation}
+
+\textbf{\'Etape~2 :} \'evaluer $G$ \`a mi-chemin avec une pr\'ediction via $K_1$ :
+\begin{equation}
+  K_2 = G\!\left(\mathbf{U}^n + \frac{\Delta t}{2}K_1\right)
+       = A_{2D}\!\left(\mathbf{U}^n + \frac{\Delta t}{2}K_1\right)
+         + F\!\left(\mathbf{U}^n + \frac{\Delta t}{2}K_1\right).
+\end{equation}
+
+\textbf{\'Etape~3 :} raffiner la pr\'ediction \`a mi-chemin avec $K_2$ :
+\begin{equation}
+  K_3 = G\!\left(\mathbf{U}^n + \frac{\Delta t}{2}K_2\right)
+       = A_{2D}\!\left(\mathbf{U}^n + \frac{\Delta t}{2}K_2\right)
+         + F\!\left(\mathbf{U}^n + \frac{\Delta t}{2}K_2\right).
+\end{equation}
+
+\textbf{\'Etape~4 :} \'evaluer $G$ au temps $t^{n+1}$ :
+\begin{equation}
+  K_4 = G\!\left(\mathbf{U}^n + \Delta t\, K_3\right)
+       = A_{2D}\!\left(\mathbf{U}^n + \Delta t\, K_3\right)
+         + F\!\left(\mathbf{U}^n + \Delta t\, K_3\right).
+\end{equation}
+
+\textbf{Mise \`a jour :}
+\begin{equation}
+  \boxed{\mathbf{U}^{n+1} = \mathbf{U}^n
+    + \frac{\Delta t}{6}\bigl(K_1 + 2K_2 + 2K_3 + K_4\bigr).}
+\end{equation}
+
+\subsection*{Application \`a l'\'equation de Nagumo 2D}
+
+En pratique, les vecteurs $\mathbf{U}^n$ peuvent \^etre stock\'es comme tableaux 2D
+de taille $(N_x+1)\times(N_y+1)$ et le produit $A_{2D}\mathbf{U}$ s'impl\'emente
+sans former explicitement $A_{2D}$ en exploitant la structure s\'eparable :
+\begin{equation}
+  (A_{2D}\mathbf{U})_{i,j} = D\,\frac{U_{i-1,j}-2U_{i,j}+U_{i+1,j}}{(\Delta x)^2}
+  + D\,\frac{U_{i,j-1}-2U_{i,j}+U_{i,j+1}}{(\Delta y)^2}.
+\end{equation}
+Cette formulation \'evite de stocker une matrice de taille $O(N_xN_y)^2$ et exploite
+la structure \`a cinq points.
+
+
+    \subsection*{Propri\'et\'es en 2D}
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Ordre :} 4 en temps (erreur locale $O((\Delta t)^5)$), 2 en espace.
+  
+     % \item \textbf{Stabilit\'e :} conditionnelle. La condition CFL 2D est d\'eriv\'ee
+      %  section~\ref{sec:vonneumann_RK4_2D} :
+       % \begin{equation}
+        %  \mu = \frac{D\,\Delta t}{h^2} \le 0{,}345
+         % \quad \text{(grille uniforme } \Delta x=\Delta y=h\text{)}.
+        %\end{equation}
+        %C'est environ \textbf{deux fois plus restrictif} qu'en 1D ($\mu\le 0{,}69$).
+    
+  \item \textbf{Co\^ut :} 4 \'evaluations du Laplacien 2D et de $f$ par pas ;
+        chaque \'evaluation co\^ute $O(N_xN_y)$.
+\end{itemize}
+
+
+\subsection{Analyse de Von~Neumann -- Runge-Kutta d'ordre~4 en 2D}
+\label{sec:vonneumann_RK4_2D}
+% -----------------------------------------------------------------------------
+
+\subsubsection*{Facteur d'amplification de RK4}
+
+Sur l'\'equation lin\'eaire $u'=\lambda u$ avec $\lambda=D\xi_{k_1,k_2}$, RK4 donne le
+facteur d'amplification :
+\begin{equation}
+  \zeta(z) = 1 + z + \frac{z^2}{2} + \frac{z^3}{6} + \frac{z^4}{24},
+  \qquad z = \Delta t\,\xi_{k_1,k_2} \le 0.
+\end{equation}
+Il s'agit du d\'eveloppement de Taylor de $e^z$ tronqu\'e \`a l'ordre~4,
+ce qui explique l'ordre~4 de la m\'ethode : $\zeta(z)=e^z+O(z^5)$.
+
+\subsubsection*{Condition de stabilit\'e en 2D}
+
+Sur l'axe r\'eel n\'egatif, la condition $|\zeta(z)|\le 1$ est satisfaite tant que
+$z\ge z_{\min}\approx -2{,}79$ (valeur d\'etermin\'ee num\'eriquement, car le polyn\^ome
+de degr\'e~4 ne s'annule pas analytiquement sur l'axe r\'eel).
+On pose $z=\Delta t\,\xi_{k_1,k_2}$ et on cherche la condition sur $\Delta t$
+pour le mode le plus contraignant. Pour $\Delta x=\Delta y=h$ :
+\begin{equation}
+  \Delta t\cdot|\xi_{\max}| = \Delta t\cdot\frac{8D}{h^2} \le 2{,}79.
+\end{equation}
+D'o\`u :
+\begin{equation}
+  \boxed{\mu = \frac{D\,\Delta t}{h^2} \le \frac{2{,}79}{8} \approx 0{,}349.}
+\end{equation}
+\textbf{Comparaison 1D vs 2D :} en 1D, la condition \'etait $\mu\le 2{,}79/4\approx 0{,}697$.
+La condition 2D est donc deux fois plus restrictive.
+
+\subsubsection*{Effet du terme r\'eactif}
+
+Avec le terme de r\'eaction $f'(u^*)$ trait\'e explicitement, le taux global est
+$\lambda_{k_1,k_2}=\xi_{k_1,k_2}+f'(u^*)$. Pour les \'etats stables ($f'(u^*)<0$),
+la r\'eaction am\'eliore la stabilit\'e (att\'enue les modes). La contrainte dominante
+reste la condition CFL diffusive.
+
+% -----------------------------------------------------------------------------
+\section{M\'ethode~2 : Euler Implicite (semi-implicite) en 2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Principe du sch\'ema semi-implicite}
+
+L'id\'ee centrale est identique au cas 1D : traiter le terme diffusif \emph{implicitement}
+(au temps $t^{n+1}$) pour b\'en\'eficier d'une stabilit\'e inconditionnelle, et le terme
+de r\'eaction \emph{explicitement} (au temps $t^n$) pour conserver la lin\'earit\'e du
+syst\`eme \`a r\'esoudre.
+
+\subsection*{D\'erivation sur l'\'equation de Nagumo 2D}
+
+On part de l'\'equation semi-discr\`ete en espace (ODE en temps) :
+\begin{equation}
+  \frac{d u_{i,j}}{dt} = D\,\Delta_h u_{i,j} + f(u_{i,j}).
+\end{equation}
+On discr\'etise la d\'eriv\'ee temporelle par une diff\'erence progressive d'ordre~1 :
+\begin{equation}
+  \frac{u_{i,j}^{n+1} - u_{i,j}^n}{\Delta t} \approx \frac{du_{i,j}}{dt}\bigg|_{t^n}.
+\end{equation}
+On \'evalue le terme diffusif au temps $t^{n+1}$ et la r\'eaction au temps $t^n$ :
+\begin{align}
+  \frac{u_{i,j}^{n+1} - u_{i,j}^n}{\Delta t}
+  &= D\!\left(\frac{u_{i+1,j}^{n+1}-2u_{i,j}^{n+1}+u_{i-1,j}^{n+1}}{(\Delta x)^2}
+             +\frac{u_{i,j+1}^{n+1}-2u_{i,j}^{n+1}+u_{i,j-1}^{n+1}}{(\Delta y)^2}\right)
+  + f(u_{i,j}^n).
+\end{align}
+On regroupe les inconnues au temps $n+1$ dans le membre gauche. Pour $\Delta x=\Delta y=h$
+et $\mu=D\Delta t/h^2$, cela donne pour chaque point int\'erieur $(i,j)$ :
+\begin{equation}
+  (1+4\mu)\,u_{i,j}^{n+1}
+  -\mu(u_{i+1,j}^{n+1}+u_{i-1,j}^{n+1}+u_{i,j+1}^{n+1}+u_{i,j-1}^{n+1})
+  = u_{i,j}^n + \Delta t\,f(u_{i,j}^n).
+\end{equation}
+En notation vectorielle, le syst\`eme lin\'eaire global s'\'ecrit :
+\begin{equation}
+  \boxed{(I - \Delta t\,A_{2D})\,\mathbf{U}^{n+1} = \mathbf{U}^n + \Delta t\,F(\mathbf{U}^n),}
+\end{equation}
+o\`u $A_{2D}$ est la matrice du Laplacien discret 2D~\eqref{eq:kron}.
+
+\subsection*{Propri\'et\'es de la matrice syst\`eme}
+
+La matrice $(I-\Delta t\,A_{2D})$ est :
+\begin{itemize}[leftmargin=1.5em]
+  \item sym\'etrique (car $A_{2D}$ est sym\'etrique) ;
+  \item \`a diagonale strictement dominante (car $1+4\mu > 4\mu$) ;
+  \item d\'efinie positive (car $A_{2D}$ est s\'emi-d\'efinie n\'egative).
+\end{itemize}
+Elle est donc inversible et le syst\`eme admet une unique solution.
+
+\subsection*{La m\'ethode ADI de Peaceman-Rachford}
+
+Le syst\`eme global de taille $(N_x+1)(N_y+1)$ n'est pas tridiagonal en 2D,
+contrairement au cas 1D. Sa r\'esolution directe co\^ute $O((N_xN_y)^{1.5})$ op\'erations
+(pour une matrice creuse) ou plus. Pour les grandes grilles, on utilise la
+\textbf{m\'ethode ADI (Alternating Direction Implicit)} de Peaceman-Rachford,
+qui d\'ecouple l'implicite en deux demi-pas dans chaque direction.
+
+\textbf{Demi-pas~1 (implicite en $x$, explicite en $y$) :}
+\begin{equation}
+  \frac{\mathbf{U}^{n+1/2} - \mathbf{U}^n}{\Delta t/2}
+  = D\,A_x\mathbf{U}^{n+1/2} + D\,A_y\mathbf{U}^n + F(\mathbf{U}^n),
+\end{equation}
+soit :
+\begin{equation}\label{eq:adi_step1}
+  \left(I - \frac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}
+  = \left(I + \frac{\Delta t}{2}D\,A_y\right)\mathbf{U}^n + \Delta t\,F(\mathbf{U}^n).
+\end{equation}
+
+\textbf{Demi-pas~2 (implicite en $y$, explicite en $x$) :}
+\begin{equation}
+  \frac{\mathbf{U}^{n+1} - \mathbf{U}^{n+1/2}}{\Delta t/2}
+  = D\,A_x\mathbf{U}^{n+1/2} + D\,A_y\mathbf{U}^{n+1},
+\end{equation}
+soit :
+\begin{equation}\label{eq:adi_step2}
+  \left(I - \frac{\Delta t}{2}D\,A_y\right)\mathbf{U}^{n+1}
+  = \left(I + \frac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}.
+\end{equation}
+
+\textbf{Avantage computationnel de l'ADI.}
+\begin{itemize}[leftmargin=1.5em]
+  \item Dans le demi-pas~1, on r\'esout $N_y+1$ syst\`emes tridiagonaux de taille $N_x+1$
+        (un pour chaque ligne $j$~fixe). Co\^ut : $O(N_xN_y)$.
+  \item Dans le demi-pas~2, on r\'esout $N_x+1$ syst\`emes tridiagonaux de taille $N_y+1$
+        (un pour chaque colonne $i$~fixe). Co\^ut : $O(N_xN_y)$.
+  \item Co\^ut total par pas : $O(N_xN_y)$ au lieu de $O((N_xN_y)^{1.5})$.
+\end{itemize}
+
+\subsection*{Propri\'et\'es de l'Euler Implicite et de l'ADI en 2D}
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Ordre :} 1 en temps, 2 en espace. Erreur $O(\Delta t+h^2)$.
+  \item \textbf{Co\^ut :} avec l'ADI, $O(N_xN_y)$ par pas de temps.
+\end{itemize}
+
+
+
+% -----------------------------------------------------------------------------
+\subsection{Analyse de Von~Neumann -- Euler Implicite en 2D}
+\label{sec:vonneumann_EI_2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Rappel du sch\'ema sur la partie diffusive}
+
+Euler implicite sur $u_t=D\Delta u$ s'\'ecrit :
+\begin{equation}
+  u_{i,j}^{n+1}
+  - \Delta t\,D\left(\frac{u_{i+1,j}^{n+1}-2u_{i,j}^{n+1}+u_{i-1,j}^{n+1}}{(\Delta x)^2}
+                    +\frac{u_{i,j+1}^{n+1}-2u_{i,j}^{n+1}+u_{i,j-1}^{n+1}}{(\Delta y)^2}\right)
+  = u_{i,j}^n.
+\end{equation}
+
+\subsection*{Application de l'analyse de Von~Neumann}
+
+On substitue $u_{i,j}^n=\rho^n e^{i(k_1x_i+k_2y_j)}$. En utilisant la valeur propre
+du Laplacien discret~\eqref{eq:eigenvalue2d} :
+\begin{equation}
+  \rho^{n+1}\bigl(1 - \Delta t\,\xi_{k_1,k_2}\bigr) = \rho^n.
+\end{equation}
+On pose $z=\Delta t\,\xi_{k_1,k_2}\le 0$ et on divise :
+\begin{equation}
+  \rho = \frac{1}{1-z} = \frac{1}{1+|\Delta t\,\xi_{k_1,k_2}|}.
+\end{equation}
+Puisque $z\le 0$, le d\'enominateur $1-z=1+|z|\ge 1$, donc :
+\begin{equation}
+  0 < \rho = \frac{1}{1+4\mu\!\left[\sin^2\!\!\left(\frac{k_1h}{2}\right)+\sin^2\!\!\left(\frac{k_2h}{2}\right)\right]} \le 1
+  \qquad\forall k_1,k_2,\;\forall \mu>0.
+\end{equation}
+\textbf{La partie diffusive d'Euler implicite est inconditionnellement stable en 2D.}
+Aucune contrainte sur $\Delta t$.
+
+\subsection*{Effet du terme r\'eactif semi-implicite}
+
+Avec la r\'eaction $\lambda=f'(u^*)$ trait\'ee explicitement au second membre :
+\begin{equation}
+  \rho = \frac{1+\Delta t\,\lambda}{1-\Delta t\,\xi_{k_1,k_2}}.
+\end{equation}
+Pour les \'etats stables ($\lambda<0$), le num\'erateur est inf\'erieur \`a~1 d\`es que
+$\Delta t<1/|\lambda|$, condition nettement moins restrictive que la CFL diffusive.
+Pour l'\'etat instable $u=a$ ($\lambda=a(1-a)>0$), $\rho>1$ si
+$\Delta t\lambda>-\Delta t\xi_{k_1,k_2}$, ce qui traduit correctement l'instabilit\'e
+physique de cet \'equilibre.
+
+
+
+% -----------------------------------------------------------------------------
+\section{M\'ethode~3 : Adams-Bashforth d'ordre~2 (AB2) en 2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Principe}
+
+Adams-Bashforth d'ordre~2 est un sch\'ema multipas explicite. Il approche l'int\'egrale
+\begin{equation}
+  \mathbf{U}^{n+1} - \mathbf{U}^n = \int_{t^n}^{t^{n+1}} G(\mathbf{U}(t))\,dt
+\end{equation}
+par interpolation de Lagrange de $G$ sur les deux niveaux pass\'es $t^n$ et $t^{n-1}$,
+puis int\'egration exacte du polyn\^ome de degr\'e~1 obtenu sur $[t^n,t^{n+1}]$.
+
+\subsection*{D\'erivation}
+
+On note $G_i^n = G(\mathbf{U}^n)$ le flux total au pas $n$, avec
+\begin{equation}
+  G_{i,j}^n = D\,\Delta_h u_{i,j}^n + f(u_{i,j}^n)
+  = D\!\left(\frac{u_{i+1,j}^n-2u_{i,j}^n+u_{i-1,j}^n}{(\Delta x)^2}
+            +\frac{u_{i,j+1}^n-2u_{i,j}^n+u_{i,j-1}^n}{(\Delta y)^2}\right)
+  + f(u_{i,j}^n).
+\end{equation}
+On approche le flux entre $t^{n-1}$ et $t^{n+1}$ par le polyn\^ome de Lagrange de
+degr\'e~1 passant par $(t^{n-1},G^{n-1})$ et $(t^n,G^n)$ :
+\begin{equation}
+  G(t) \approx G^{n-1}\frac{t-t^n}{\Delta t}
+             + G^n\frac{t-t^{n-1}}{-(-\Delta t)}
+             + O((\Delta t)^2).
+\end{equation}
+L'int\'egration exacte de ce polyn\^ome sur $[t^n,t^{n+1}]$ donne les coefficients
+$3/2$ et $-1/2$ :
+\begin{equation}
+  \int_{t^n}^{t^{n+1}} G(t)\,dt \approx \Delta t\!\left(\frac{3}{2}G^n - \frac{1}{2}G^{n-1}\right).
+\end{equation}
+Le sch\'ema AB2 en 2D s'\'ecrit donc, pour tout point $(i,j)$ :
+\begin{equation}
+  \boxed{u_{i,j}^{n+1} = u_{i,j}^n
+    + \Delta t\!\left(\frac{3}{2}G_{i,j}^n - \frac{1}{2}G_{i,j}^{n-1}\right).}
+\end{equation}
+
+\subsection*{Initialisation}
+
+AB2 n\'ecessite $\mathbf{U}^0$ (condition initiale) et $\mathbf{U}^1$. On calcule
+$\mathbf{U}^1$ par un pas d'Euler explicite :
+\begin{equation}
+  \mathbf{U}^1 = \mathbf{U}^0 + \Delta t\,G(\mathbf{U}^0).
+\end{equation}
+
+\subsection*{Algorithme (pseudocode)}
+
+\begin{lstlisting}
+% -- Initialisation : calcul de G^0 et U^1 par Euler explicite --
+G_old = A_2D * U(:) + f(U);     % G au temps t^0
+U     = U + dt * G_old;         % U^1 par Euler
+G_new = A_2D * U(:) + f(U);     % G au temps t^1
+
+% -- Boucle AB2 pour n = 1, 2, ... Nt-1 --
+for n = 2 : Nt
+    U_next = U + dt * (1.5 * G_new - 0.5 * G_old);
+    G_old  = G_new;
+    G_new  = A_2D * U_next(:) + f(U_next);
+    U      = U_next;
+end
+\end{lstlisting}
+
+\subsection*{Propri\'et\'es en 2D}
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Ordre :} 2 en temps. Erreur globale $O((\Delta t)^2+h^2)$.
+  \item \textbf{Stabilit\'e :} conditionnelle. La condition CFL 2D (section~\ref{sec:vonneumann_AB2_2D}) :
+        \begin{equation}
+          \mu = \frac{D\,\Delta t}{h^2} \le \frac{1}{8}
+          \quad\text{(grille uniforme)}.
+        \end{equation}
+        C'est \textbf{deux fois plus restrictif} qu'en 1D ($\mu\le 1/4$).
+  \item \textbf{Co\^ut :} un seul calcul de $G$ par pas (le calcul de $G^n$
+        est r\'eutilis\'e comme $G^{n-1}$ au pas suivant). Co\^ut $O(N_xN_y)$.
+\end{itemize}
+
+
+% -----------------------------------------------------------------------------
+\subsection{Analyse de Von~Neumann -- Adams-Bashforth~2 en 2D}
+\label{sec:vonneumann_AB2_2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Rappel du sch\'ema sur la partie diffusive}
+
+AB2 sur la partie diffusive $u_t=D\Delta u$ s'\'ecrit :
+\begin{equation}
+  u_{i,j}^{n+1} = u_{i,j}^n
+  + \Delta t\!\left(\frac{3}{2}D\,\Delta_h u_{i,j}^n - \frac{1}{2}D\,\Delta_h u_{i,j}^{n-1}\right).
+\end{equation}
+
+\subsection*{Application de l'analyse de Von~Neumann}
+
+On substitue $u_{i,j}^n=\zeta^n e^{i(k_1x_i+k_2y_j)}$ et on d\'efinit
+$z=\Delta t\,\xi_{k_1,k_2}\le 0$ (nombre de Courant-Diffusion 2D).
+En substituant dans le sch\'ema :
+\begin{equation}
+  \zeta^{n+1} = \zeta^n + \Delta t\!\left(\frac{3}{2}\xi_{k_1,k_2}\,\zeta^n
+                            - \frac{1}{2}\xi_{k_1,k_2}\,\zeta^{n-1}\right)
+              = \left(1+\frac{3}{2}z\right)\zeta^n - \frac{1}{2}z\,\zeta^{n-1}.
+\end{equation}
+On divise par $\zeta^{n-1}$ en posant $\zeta^n/\zeta^{n-1}=\zeta$ (constante) :
+\begin{equation}
+  \zeta^2 - \left(1+\frac{3}{2}z\right)\zeta + \frac{z}{2} = 0.
+\end{equation}
+C'est le \textbf{m\^eme polyn\^ome caract\'eristique qu'en 1D}, mais avec $z$ \'evalu\'e
+sur la valeur propre 2D $\xi_{k_1,k_2}$.
+
+\subsection*{\'Etude de la stabilit\'e}
+
+D'apr\`es l'analyse 1D (section de r\'ef\'erence), la r\'egion de stabilit\'e sur
+l'axe r\'eel n\'egatif est $z\in[-1,0]$. Le mode le plus contraignant est celui
+o\`u $|\xi_{k_1,k_2}|$ est maximum. Pour $\Delta x=\Delta y=h$ :
+\begin{equation}
+  \Delta t\cdot|\xi_{\max}| = \Delta t\cdot\frac{8D}{h^2} \le 1
+  \qquad\Longrightarrow\qquad
+  \boxed{\mu = \frac{D\,\Delta t}{h^2} \le \frac{1}{8}.}
+\end{equation}
+\textbf{La contrainte CFL d'AB2 en 2D est deux fois plus s\`ev\`ere qu'en 1D} ($\mu\le 1/4$).
+Elle est \textbf{quatre fois plus s\`ev\`ere} que pour Euler explicite en 1D.
+
+\medskip
+\noindent\textbf{Interpr\'etation.} L'extrapolation sur deux pas amplifie l'erreur si
+$\Delta t$ est trop grand. En 2D, la diffusion dans deux directions double l'effet
+dissipatif du Laplacien, exigeant un pas de temps deux fois plus petit pour maintenir
+$|z|\le 1$.
+
+% -----------------------------------------------------------------------------
+\section{M\'ethode~4 : Adams-Moulton d'ordre~2 (AM2) en 2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Principe}
+
+Adams-Moulton d'ordre~2 est la r\`egle des trap\`ezes appliqu\'ee \`a l'int\'egrale exacte.
+Comme pour l'Euler implicite, on adopte une approche \emph{semi-implicite} : la diffusion
+est trait\'ee implicitement, la r\'eaction explicitement.
+
+\subsection*{D\'erivation sur l'\'equation de Nagumo 2D}
+
+On part de la formule exacte
+$\mathbf{U}^{n+1} = \mathbf{U}^n + \int_{t^n}^{t^{n+1}} G(\mathbf{U})\,dt$
+et on approche l'int\'egrale par la r\`egle des trap\`ezes :
+\begin{equation}
+  \int_{t^n}^{t^{n+1}} G(\mathbf{U})\,dt \approx \frac{\Delta t}{2}\bigl(G(\mathbf{U}^n)+G(\mathbf{U}^{n+1})\bigr).
+\end{equation}
+En d\'eveloppant $G = A_{2D}\mathbf{U} + F(\mathbf{U})$ et en traitant $A_{2D}\mathbf{U}$
+implicitement et $F(\mathbf{U})$ explicitement :
+\begin{equation}
+  \mathbf{U}^{n+1} = \mathbf{U}^n
+    + \frac{\Delta t}{2}\bigl(A_{2D}\mathbf{U}^n + A_{2D}\mathbf{U}^{n+1}\bigr)
+    + \frac{\Delta t}{2}\bigl(F(\mathbf{U}^n) + F(\mathbf{U}^n)\bigr).
+\end{equation}
+(La r\'eaction est approxim\'ee explicitement par $2F(\mathbf{U}^n)$ pour \'eviter la
+r\'esolution non lin\'eaire.) On regroupe les termes en $\mathbf{U}^{n+1}$ :
+\begin{equation}
+  \boxed{\left(I - \frac{\Delta t}{2}A_{2D}\right)\mathbf{U}^{n+1}
+    = \mathbf{U}^n + \frac{\Delta t}{2}\bigl(A_{2D}\mathbf{U}^n + 2F(\mathbf{U}^n)\bigr).}
+\end{equation}
+
+\subsection*{Application de l'ADI \`a Adams-Moulton}
+
+De m\^eme qu'Euler implicite, AM2 peut b\'en\'eficier de la d\'ecomposition ADI.
+En utilisant la d\'ecomposition $A_{2D} = A_x \otimes I + I \otimes A_y$, le sch\'ema
+AM2+ADI se d\'ecoupe en deux demi-pas :
+
+\textbf{Demi-pas~1 (implicite en $x$) :}
+\begin{equation}
+  \left(I - \frac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}
+  = \left(I + \frac{\Delta t}{2}D\,A_y\right)\mathbf{U}^n + \Delta t\,F(\mathbf{U}^n).
+\end{equation}
+
+\textbf{Demi-pas~2 (implicite en $y$) :}
+\begin{equation}
+  \left(I - \frac{\Delta t}{2}D\,A_y\right)\mathbf{U}^{n+1}
+  = \left(I + \frac{\Delta t}{2}D\,A_x\right)\mathbf{U}^{n+1/2}.
+\end{equation}
+
+Ce sch\'ema est connu sous le nom de Peaceman-Rachford ADI et est A-stable (inconditionnellement
+stable), d'ordre~2 en temps et en espace.
+
+\subsection*{Propri\'et\'es en 2D}
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Ordre :} 2 en temps, 2 en espace. Erreur $O((\Delta t)^2+h^2)$.
+  \item \textbf{Stabilit\'e :} inconditionnellement stable (A-stable) pour la partie
+       diffusive (d\'emontr\'e section~\ref{sec:vonneumann_AM2_2D}).
+  \item \textbf{Co\^ut :} avec l'ADI, $O(N_xN_y)$ par pas, par r\'esolution de
+        syst\`emes 1D tridiagonaux.
+  \item \textbf{Avantage :} meilleur compromis ordre/co\^ut pour les probl\`emes raides
+        ou les grandes grilles 2D.
+\end{itemize}
+
+
+
+
+
+
+% -----------------------------------------------------------------------------
+\subsection{Analyse de Von~Neumann -- Adams-Moulton~2 en 2D}
+\label{sec:vonneumann_AM2_2D}
+% -----------------------------------------------------------------------------
+
+\subsection*{Rappel du sch\'ema sur la partie diffusive}
+
+AM2 (trapèzes) sur la partie diffusive $u_t=D\Delta u$ :
+\begin{equation}
+  u_{i,j}^{n+1} = u_{i,j}^n
+  + \frac{\Delta t}{2}\!\left(D\,\Delta_h u_{i,j}^n + D\,\Delta_h u_{i,j}^{n+1}\right).
+\end{equation}
+
+\subsection*{Application de l'analyse de Von~Neumann}
+
+On substitue $u_{i,j}^n=\zeta^n e^{i(k_1x_i+k_2y_j)}$ et on pose
+$z=\Delta t\,\xi_{k_1,k_2}\le 0$. Le terme $D\Delta_h u_{i,j}^n$ donne
+$\xi_{k_1,k_2}\,\zeta^n$ (par lin\'earit\'e). On obtient :
+\begin{equation}
+  \zeta^{n+1} = \zeta^n
+  + \frac{\Delta t}{2}\bigl(\xi_{k_1,k_2}\,\zeta^n + \xi_{k_1,k_2}\,\zeta^{n+1}\bigr).
+\end{equation}
+On regroupe les termes en $\zeta^{n+1}$ :
+\begin{equation}
+  \zeta^{n+1}\!\left(1-\frac{z}{2}\right) = \zeta^n\!\left(1+\frac{z}{2}\right).
+\end{equation}
+Le sch\'ema \'etant \`a un seul pas, on obtient directement le
+\textbf{facteur d'amplification} :
+\begin{equation}
+  \zeta = \frac{1+z/2}{1-z/2}.
+\end{equation}
+
+\subsection*{\'Etude de la stabilit\'e}
+
+On v\'erifie $|\zeta|\le 1$ pour tout $z\le 0$. On calcule :
+\begin{equation}
+  \left(1-\frac{z}{2}\right)^2 - \left(1+\frac{z}{2}\right)^2
+  = \left[-\frac{z}{2}+(-\frac{z}{2})\right]\cdot 2 = -2z \ge 0
+  \quad\text{pour }z\le 0.
+\end{equation}
+Donc $(1-z/2)^2\ge(1+z/2)^2$, ce qui entra\^{\i}ne :
+\begin{equation}
+  |\zeta|^2 = \frac{(1+z/2)^2}{(1-z/2)^2} \le 1 \qquad\forall z\le 0.
+\end{equation}
+\textbf{AM2 est inconditionnellement stable en 2D, quelle que soit la valeur de $z=\Delta t\,\xi_{k_1,k_2}$.}
+\begin{equation}
+  \boxed{\mu = \frac{D\,\Delta t}{h^2}\;\text{quelconque}\ge 0
+         \quad\Longrightarrow\quad|\zeta|\le 1.}
+\end{equation}
+On note que $|\zeta|<1$ strictement pour $z<0$ (mode diffusif) : AM2 est A-stable au sens
+de Dahlquist, propri\'et\'e plus forte que la simple stabilit\'e sur l'axe r\'eel n\'egatif.
+Ce r\'esultat est \textbf{identique au cas 1D} et ne d\'epend pas de la dimension.
+
+% -----------------------------------------------------------------------------
+\section{Tableau comparatif et stabilit\'e non lin\'eaire en 2D}
+% -----------------------------------------------------------------------------
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lllcllll@{}}
+\toprule
+\textbf{M\'ethode} & \textbf{Type} & \textbf{Pas} & \textbf{Ordre} &
+\textbf{Condition sur $\mu$ (2D)} & \textbf{Condition sur $\mu$ (1D)} &
+\textbf{Stab.\ diff.} & \textbf{Co\^ut/pas} \\
+\midrule
+RK4           & explicite & 1     & 4 & $\mu\le 0{,}349$              & $\mu\le 0{,}697$ & cond.\ & 4 \'eval.\ $G$ \\[4pt]
+Euler impl.   & implicite & 1     & 1 & aucune                        & aucune           & \textbf{incond.}  & syst.\ 2D      \\[4pt]
+AB2           & explicite & multi & 2 & $\mu\le\dfrac{1}{8}$          & $\mu\le\dfrac{1}{4}$ & cond.\ & 1 \'eval.\ $G$ \\[4pt]
+AM2 (ADI)     & implicite & 1     & 2 & aucune (A-stable)             & aucune (A-stable)& \textbf{incond.}  & syst.\ 1D ADI  \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison des conditions de stabilit\'e en 2D vs 1D pour une grille uniforme
+$\Delta x=\Delta y=h$. Le nombre de Courant-Diffusion est $\mu=D\Delta t/h^2$.
+Les conditions CFL explicites en 2D sont exactement \textbf{deux fois plus restrictives}
+qu'en 1D.}
+\end{table}
+
+\medskip
+\noindent\textbf{Stabilit\'e non lin\'eaire en 2D.}
+L'analyse de Von~Neumann est strictement valable pour les \'equations lin\'eaires.
+Pour l'\'equation de Nagumo non lin\'eaire, on remplace $f'(u^*)$ par
+$\max_{u\in[0,1]}|f'(u)|=\max(a,\,a(1-a),\,1-a)$.
+Les conditions pratiques pour les sch\'emas explicites sur grille uniforme sont :
+\begin{align}
+  \text{(RK4)}\quad
+  & \Delta t \le \min\!\left(\frac{0{,}349\,h^2}{D},\;\frac{1}{\max|f'|}\right), \\[4pt]
+  \text{(AB2)}\quad
+  & \Delta t \le \min\!\left(\frac{h^2}{8D},\;\frac{1}{\max|f'|}\right).
+\end{align}
+La contrainte diffusive domine g\'en\'eralement pour les maillages fins.
+
+% -----------------------------------------------------------------------------
+\section{Convergence num\'erique en 2D}
+% -----------------------------------------------------------------------------
+
+L'ordre de convergence se v\'erifie par une \'etude multi-maillages. On calcule l'erreur
+par rapport \`a une solution de r\'ef\'erence tr\`es fine :
+\begin{equation}
+  E_h = \bigl\|u_h(\cdot,\cdot,T) - u_{\text{ref}}(\cdot,\cdot,T)\bigr\|_{L^2(\Omega)}
+  = \sqrt{h^2\sum_{i=0}^{N_x}\sum_{j=0}^{N_y}
+    \bigl(u_{i,j}^{N_t} - u_{\text{ref}}(x_i,y_j,T)\bigr)^2}.
+\end{equation}
+En repr\'esentation $\log$-$\log$ de $E_h$ en fonction de $\Delta t$ (resp.~$h$), on attend :
+\begin{itemize}[leftmargin=1.5em]
+  \item pente~1 pour Euler implicite (ordre~1 en temps) ;
+  \item pente~2 pour AB2 et AM2 (ordre~2 en temps) ;
+  \item pente~4 pour RK4 (ordre~4 en temps) ;
+  \item pente~2 pour tous les sch\'emas en espace (diff\'erences centr\'ees d'ordre~2).
+\end{itemize}
+Ces pentes th\'eoriques sont identiques \`a celles du cas 1D, la dimension spatiale
+n'affectant que la taille des matrices et les conditions CFL.
+
+% =============================================================================
+\chapter{Partie~III -- Simulations et r\'esultats en 2D}
+% =============================================================================
+% ============================================================
+%  CONTEXTE D'APPLICATION -- \'Equation de Nagumo 2D
+%  Exemple concret : invasion du criquet p\`elerin
+%  dans une plaine agricole africaine
+% ============================================================
+% ============================================================
+
+\subsection*{Situation \'ecologique}
+
+Le \textbf{criquet p\`elerin} (\textit{Schistocerca gregaria}, Forsk\aa{}l 1775) est
+l'un des ravageurs les plus d\'estructeurs de l'agriculture africaine et proche-orientale.
+Une invasion de grande ampleur peut d\'etruire en quelques heures les cultures vivri\`eres
+de plusieurs milliers d'hectares, mena\c{c}ant la s\'ecurit\'e alimentaire de dizaines de
+millions de personnes. L'Organisation des Nations Unies pour l'alimentation et l'agriculture
+(FAO) estime qu'une seule localisation d'essaim d'un kilom\`etre carr\'e contient environ
+40 millions d'individus capables de consommer en une journ\'ee l'\'equivalent de la
+nourriture de 35\,000 personnes.
+
+Ce qui rend ce ravageur scientifiquement fascinant, et \'ecologiquement dangereux,
+est sa \textbf{phase transition} : le criquet p\`elerin existe sous deux formes
+biologiquement distinctes, la forme \emph{solitaire} et la forme \emph{gr\'egaire},
+selon la densit\'e locale de population. Ce ph\'enom\`ene est appel\'e
+\textbf{gr\'egarisation} et constitue un exemple naturel remarquable de bistabilit\'e.
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Phase solitaire} ($u \approx 0$) : les individus sont discrets,
+        de couleur verte ou brune, solitaires, et n'ont pas de comportement migrateur.
+        Leur impact agricole est n\'egligeable. Cette phase correspond \`a la densit\'e
+        de fond normale de l'esp\`ece en conditions adverses (s\'echeresse, ressources
+        limit\'ees).
+
+  \item \textbf{Phase gr\'egaire} ($u \approx 1$) : au-del\`a d'un \textbf{seuil
+        critique de densit\'e} locale $a$, les individus changent morphologiquement et
+        comportementalement en l'espace de quelques g\'en\'erations. Ils deviennent
+        jaunes et noirs, s'agr\`egent activement, forment des essaims pouvant contenir
+        des milliards d'individus, et se mettent en mouvement sur des centaines voire
+        des milliers de kilom\`etres.
+
+  \item \textbf{Seuil de grégarisation} ($u = a$) : ce seuil est le niveau de densit\'e
+        en-de\c{c}a duquel la population reste solitaire et se r\'esorbe ($u \to 0$),
+        et au-del\`a duquel elle bascule irr\'eversiblement vers la phase gr\'egaire
+        ($u \to 1$). C'est exactement la structure d'un \textbf{\'equilibre instable}
+        au sens de l'\'equation de Nagumo.
+\end{itemize}
+
+\subsection*{Formulation math\'ematique}
+
+On note $u(x,y,t) \in [0,1]$ la \textbf{densit\'e de population normalis\'ee} de criquets
+en tout point $(x,y)$ d'une plaine agricole mod\'elis\'ee par le domaine carr\'e
+$\Omega = [0, L_x]\times[0, L_y]$ (en kilom\`etres), et \`a l'instant~$t$ (en jours).
+L'\'evolution spatiotemporelle de cette densit\'e est r\'egie par~:
+\begin{equation}\label{eq:nagumo2D_criquet}
+  \frac{\partial u}{\partial t}
+  = D\,\Delta u + u(1-u)(u-a),
+  \qquad (x,y)\in\Omega,\quad t > 0,
+\end{equation}
+o\`u $\Delta u = \partial_{xx}u + \partial_{yy}u$ est le Laplacien bidimensionnel.
+
+\medskip
+\noindent Chaque terme a une interpr\'etation \'ecologique directe dans ce contexte~:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Dispersion spatiale $D\,\Delta u$~:} les criquets en phase solitaire
+        se d\'eplacent al\'eatoirement sous l'effet du vent, de la recherche de
+        nourriture et de la pression de pr\'edation. Ce mouvement diffusif de faible
+        amplitude est caract\'eris\'e par le coefficient $D > 0$. On utilise
+        $D = 1\;\text{km}^2/\text{jour}$, valeur compatible avec les mouvements
+        locaux observ\'es de criquets solitaires en zone sah\'elienne
+        (d\'eplacements de quelques kilom\`etres par jour dans des directions al\'eatoires).
+
+  \item \textbf{R\'eaction locale bistable $u(1-u)(u-a)$~:} ce terme traduit la
+        dynamique de population \emph{en un point fixe} de la plaine~:
+        \begin{itemize}[leftmargin=1.5em]
+          \item si $u < a = 0{,}25$~: la densit\'e est trop faible pour d\'eclencher
+                la gr\'egarisation ; la population se disperse et d\'ecro\^{\i}t
+                vers $u = 0$ (extinction locale de la phase gr\'egaire) ;
+          \item si $u > a = 0{,}25$~: la densit\'e locale d\'epasse le seuil ;
+                les interactions mutuelles entre individus (attraction visuelle,
+                olfactive, acoustique) s'emballent, et la population bascule
+                vers la phase gr\'egaire \`a densit\'e maximale $u = 1$.
+        \end{itemize}
+
+  \item \textbf{Seuil $a = 0{,}25$~:} on fixe le seuil de gr\'egarisation \`a
+        25\,\% de la densit\'e maximale, valeur coh\'erente avec les observations
+        de terrain indiquant qu'une densit\'e d'environ 50 \`a 100 criquets par
+        m\`etre carr\'e amorce irr\'eversiblement le ph\'enom\`ene gr\'egaire
+        (densit\'e maximale de r\'ef\'erence~: 200 individus/m$^2$).
+\end{itemize}
+
+\subsection*{Domaine, param\`etres et horizon temporel}
+
+On mod\'elise une \textbf{plaine agricole sah\'elienne} de 60~km~$\times$~60~km,
+surface typique d'une zone de culture c\'er\'ealière affectée lors d'une invasion
+localis\'ee~:
+\begin{equation}
+  L_x = L_y = 60\;\text{km},\quad D = 1\;\text{km}^2/\text{jour},
+  \quad a = 0{,}25,\quad T = 20\;\text{jours}.
+\end{equation}
+La grille spatiale uniforme de pas $h = 0{,}6\;\text{km}$ ($101\times101$ n\oe{}uds)
+permet de r\'esoudre les structures spatiales du front \`a l'\'echelle du kilom\`etre.
+L'horizon temporel de $T = 20$~jours correspond \`a environ deux \`a trois g\'en\'erations
+larvaires, dur\'ee pertinente pour l'\'etude de la propagation initiale d'un foyer
+de gr\'egarisation avant les premi\`eres interventions de lutte antiacridienne.
+
+Les conditions aux bords sont de type \textbf{Neumann homog\`ene}
+($\partial_n u = 0$ sur $\partial\Omega$), signifiant que la plaine est
+consid\'er\'ee comme un syst\`eme isol\'e~: aucun flux de criquets n'entre
+ni ne sort du domaine \'etudi\'e aux fronti\`eres. Cette hypoth\`ese est
+r\'ealiste si la zone de simulation est encadr\'ee par des barri\`eres g\'eographiques
+naturelles (massifs montagneux, fleuves, zones d\'esertiques).
+
+La \textbf{vitesse th\'eorique} de propagation du front de gr\'egarisation est~:
+\begin{equation}
+  c^* = \sqrt{2D}\left(\frac{1}{2}-a\right)
+      = \sqrt{2}\times 0{,}25
+      \approx 0{,}354\;\text{km/jour}.
+\end{equation}
+Cette faible vitesse refl\`ete la dynamique de la phase solitaire diffusive~; elle
+ne mod\'elise pas le d\'eplacement actif des essaims gr\'egaires (qui peuvent atteindre
+150~km/jour sous le vent) mais bien la \textbf{progression du front de transition}
+entre zone solitaire et zone grégarisée.
+
+\subsection*{Trois sc\'enarios d'invasion}
+
+Les conditions initiales suivantes correspondent \`a trois sc\'enarios
+d'invasion biologiquement distincts et observ\'es sur le terrain.
+
+\medskip
+\noindent\textbf{Sc\'enario~1 -- Front d'invasion frontal (ligne d'av\`ene).}
+\begin{equation}
+  u_0(x,y) = \frac{1}{1+e^{(x-x_0)/\sigma}},
+  \qquad x_0 = L_x\;\text{km},\quad \sigma = 2\;\text{km}.
+\end{equation}
+Ce sc\'enario repr\'esente une \textbf{vague d'invasion provenant de l'ouest}~: une
+bande de territoire de 30~km d\'ej\`a grégarisée ($u\approx 1$) pousse vers l'est
+un front de transition de largeur caract\'eristique $\sigma = 2$~km. C'est la
+configuration typ\-ique observ\'ee lors des invasions transfrontali\`eres progressant
+depuis les zones de reproduction du Sahel occidental. Ce cas de r\'ef\'erence permet
+de valider la vitesse th\'eorique $c^*$ et de comparer les quatre sch\'emas num\'eriques.
+
+\medskip
+\noindent\textbf{Sc\'enario~2 -- Foyer d'\'eclosion ponctuel (zone de reproduction isol\'ee).}
+\begin{equation}
+  u_0(x,y) = \begin{cases}
+    1 & \text{si } r < R_0 = 15\;\text{km}, \\
+    0 & \text{sinon},
+  \end{cases}
+  \qquad r = \sqrt{(x-30)^2+(y-30)^2}.
+\end{equation}
+Ce sc\'enario mod\'elise l'\textbf{\'emergence d'un foyer de gr\'egarisation
+\`a partir d'une zone de ponte isol\'ee}~: une cuvette humide temporaire de
+rayon 15~km, tras fr\'equente dans les r\'egions semi-arides apr\`es une pluie
+localis\'ee, a permis une reproduction massive qui porte la densit\'e locale
+au-del\`a du seuil~$a$. La condition $R_0 = 15\;\text{km} > R_c = D\sqrt{2D}/c^*
+\approx 8\;\text{km}$ garantit que le foyer est suffisamment grand pour ne pas
+s'\'eteindre spontan\'ement et g\'en\'erer une \textbf{onde concentrique de
+gr\'egarisation} se propageant radialement dans toutes les directions. Ce sc\'enario
+est biologiquement le plus repr\'esentatif des d\'emarrages d'invasion observ\'es
+en Afrique de l'Ouest.
+
+\medskip
+\noindent\textbf{Sc\'enario~3 -- Front perturb\'e (irr\'egularit\'e g\'eographique).}
+\begin{equation}
+  u_0(x,y)
+  = \frac{1}{1+\exp\!\Bigl(\dfrac{x - 30 - \varepsilon\sin(2\pi y/60)}{\sigma}\Bigr)},
+  \qquad \varepsilon = 5\;\text{km}.
+\end{equation}
+Ce sc\'enario repr\'esente un \textbf{front d'invasion morph\'ologiquement irr\'egulier}~:
+la ligne de transition entre zone gr\'egaire et zone solitaire pr\'esente une ondulation
+sinuso\"idale d'amplitude $\varepsilon = 5$~km en direction nord-sud. Biologiquement,
+cette d\'eformation peut r\'esulter de la pr\'esence d'obstacles (rivi\`eres, zones
+rocheuses, champs trait\'es aux insecticides) qui acc\'el\`erent ou ralentissent
+localement l'avance du front. La simulation montre le r\^ole r\'egularisateur de la
+diffusion~: la tension de courbure du front lisse progressivement les irr\'egularit\'es
+g\'eom\'etriques, et le front retrouve asymptotiquement sa forme plane avanant
+\`a vitesse~$c^*$.
+
+\subsection*{Questions scientifiques adress\'ees}
+
+Ce cadre de simulation permet d'\'etudier les questions suivantes, directement
+pertinentes pour la gestion des invasions acridienne~:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Vitesse de propagation~:} les sch\'emas num\'eriques reproduisent-ils
+        fid\`element la vitesse analytique $c^* \approx 0{,}354\;\text{km/jour}$ du
+        front de gr\'egarisation dans le cas plan~?
+
+  \item \textbf{Extension d'un foyer~:} \`a partir de quel rayon critique un foyer
+        de gr\'egarisation est-il irr\'eversiblement condamn\'e \`a s'\'etendre~?
+        Quelle est la vitesse d'expansion radiale en fonction de l'\'eloignement
+        du centre~?
+
+  \item \textbf{R\'esilience du front~:} en combien de jours un front irr\'egulier
+        (d\^u \`a des obstacles ou des traitements partiels) se r\'egularise-t-il
+        sous l'effet de la diffusion spatiale~?
+
+  \item \textbf{Robustesse num\'erique~:} les m\'ethodes implicites (Euler implicite,
+        Adams-Moulton~2) permettent-elles de simuler fid\`element 20~jours d'invasion
+        avec un pas de temps dix fois plus grand que les sch\'emas explicites, sans
+        d\'eformer la vitesse ou le profil du front de gr\'egarisation~?
+\end{enumerate}
+% -----------------------------------------------------------------------------
+\section{Param\`etres de simulation}
+% -----------------------------------------------------------------------------
+
+On utilise les param\`etres suivants pour la simulation 2D :
+\begin{equation}
+  L_x=L_y=60,\quad D=1,\quad a=0{,}25,\quad T=20.
+\end{equation}
+La grille spatiale est choisie uniforme $\Delta x=\Delta y=h$ avec $N_x=N_y=100$
+intervalles (grille de $101\times 101$ noeuds).
+
+La vitesse th\'eorique du front plan vaut $c^*=\sqrt{2}(0{,}5-0{,}25)\approx 0{,}354$.
+
+
+\begin{comment}
+    
+\subsection*{Conditions initiales pour la 2D}
+
+Plusieurs choix de conditions initiales permettent d'observer des dynamiques diff\'erentes :
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Front plan (vertical) :}
+        \begin{equation}
+          u_0(x,y) = \frac{1}{1+e^{(x-x_0)/\sigma}},\quad x_0=L_x/2,\;\sigma=2.
+        \end{equation}
+        Permet de v\'erifier la vitesse $c^*$ et de valider les sch\'emas.
+
+  \item \textbf{Front circulaire (onde concentrique) :}
+        \begin{equation}
+          u_0(x,y) = \begin{cases}1 & r < R_0,\\ 0 & r \ge R_0,\end{cases}
+          \quad r=\sqrt{(x-L_x/2)^2+(y-L_y/2)^2},\; R_0=15.
+        \end{equation}
+        Si $R_0>R_c=D\sqrt{2D}/c^*$, l'onde s'\'etend vers l'ext\'erieur.
+
+  \item \textbf{Front plan avec perturbation sinuso\"idale :}
+        \begin{equation}
+          u_0(x,y) = \frac{1}{1+e^{(x-x_0-\varepsilon\sin(2\pi y/L_y))/\sigma}},
+          \quad\varepsilon=5.
+        \end{equation}
+        Permet d'observer l'effet r\'egularisant de la courbure sur le front.
+\end{enumerate}
+
+\end{comment}
+
+% -----------------------------------------------------------------------------
+\section{Comparaison des quatre sch\'emas en 2D}
+% -----------------------------------------------------------------------------
+
+Les simulations doivent comparer :
+\begin{itemize}[leftmargin=1.5em]
+  \item le profil 2D $u(x,y,T)$ visualis\'e par \texttt{imagesc} ou \texttt{contourf} ;
+  \item la position du front (isovaleur $u=0{,}5$) \`a plusieurs instants ;
+  \item la vitesse num\'erique observ\'ee vs la vitesse th\'eorique $c^*$ ;
+  \item la stabilit\'e et l'absence d'oscillations parasites.
+\end{itemize}
+
+\textbf{Observations attendues.}
+\begin{itemize}[leftmargin=1.5em]
+  \item RK4 donne la meilleure pr\'ecision temporelle (ordre~4) pour les sch\'emas
+        explicites, mais avec la contrainte CFL la plus s\^ure ($\mu\le 0{,}349$).
+  \item AB2 est d'ordre~2 mais avec une contrainte CFL plus sev\`ere ($\mu\le 1/8$)~;
+        \`a maillage \'egal, il n\'ecessite quatre fois plus de pas de temps qu'Euler
+        implicite.
+  \item Euler implicite est robuste pour les grandes valeurs de $\Delta t$, mais
+        d'ordre~1 seulement.
+  \item AM2 (ADI) offre le meilleur compromis~: ordre~2, pas de contrainte CFL,
+        co\^ut $O(N_xN_y)$ par pas.
+\end{itemize}
+
+% -----------------------------------------------------------------------------
+\section{\'Etude de sensibilit\'e en 2D}
+% -----------------------------------------------------------------------------
+
+\textbf{Effet du param\`etre $a$.}
+Comme en 1D, $a$ contr\^ole le sens de propagation :
+$a<1/2$ (avance vers la droite/ext\'erieur), $a>1/2$ (recule), $a=1/2$ (stationnaire).
+En 2D, $a=1/2$ donne une dynamique purement gouvern\'ee par la courbure (mouvement par
+courbure moyenne).
+
+\textbf{Effet de $D$.}
+La largeur du front est proportionnelle \`a $\sqrt{2D}$. Un grand $D$ donne
+un front large et lisse~; un petit $D$ donne un front raide, num\'eriquement plus
+exigeant (besoin d'un maillage fin ou d'un $\Delta t$ plus petit).
+
+\textbf{Forme du front.}
+\begin{itemize}[leftmargin=1.5em]
+  \item Un front initialement perturb\'e se lisse par l'effet de la diffusion et converge
+        vers le front plan th\'eorique (stabilit\'e orbitale).
+  \item Une onde circulaire avec $R_0>R_c$ s'\'etend avec une vitesse
+        $\dot R\approx c^*-D\sqrt{2D}/R$ qui tend vers $c^*$ quand $R\to\infty$.
+  \item Une onde circulaire avec $R_0<R_c$ s'effondre~: le coeur trop petit est ``absorb\'e''
+        par la phase $u=0$.
+\end{itemize}
+
+% -----------------------------------------------------------------------------
+\section{Co\^ut computationnel en 2D}
+% -----------------------------------------------------------------------------
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Sch\'ema & $\Delta t_{\max}$ (CFL) & Nb.\ pas min.\ & Co\^ut/pas & Co\^ut total\\
+\midrule
+RK4           & $0{,}349\,h^2/D$  & $T\cdot 4D/(0{,}349\,h^2)$ & $4\times O(N^2)$    & \'elev\'e \\
+Euler impl.   & libre             & choisir               & syst.\ $A_{2D}$     & mod\'er\'e \\
+AB2           & $h^2/(8D)$        & $T\cdot 8D/h^2$       & $1\times O(N^2)$    & tr\`es \'elev\'e \\
+AM2 + ADI     & libre             & choisir               & $2\times O(N)$ tridag & faible \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison du co\^ut computationnel pour $N=N_x=N_y$.
+%L'ADI transforme la r\'esolution implicite 2D en deux s\'equences de syst\`emes
+%tridiagonaux 1D, ce qui en fait l'option la plus efficace pour les grandes grilles.
+}
+\end{table}
+
+\begin{comment}
+% =============================================================================
+\chapter{Code MATLAB 2D}
+% =============================================================================
+
+\begin{lstlisting}[style=matlabstyle,caption={Script MATLAB 2D complet : nagumo2D\_simulation.m}]
+%% nagumo2D_simulation.m
+% Simulation de l'equation de Nagumo 2D par quatre schemas
+% u_t = D*(u_xx + u_yy) + u*(1-u)*(u-a)
+% (x,y) in [0,Lx]x[0,Ly], t in [0,T]
+% Conditions de Neumann homogenes sur tout le bord.
+
+clear; close all; clc;
+
+%% =========================================================
+%%  PARAMETRES PHYSIQUES
+%% =========================================================
+Lx = 60;   Ly = 60;    % tailles du domaine
+D  = 1;                % diffusion
+a  = 0.25;             % seuil (0 < a < 1)
+T  = 20;               % temps final
+
+%% =========================================================
+%%  DISCRETISATION SPATIALE
+%% =========================================================
+Nx = 100;  Ny = 100;               % nombre d'intervalles
+dx = Lx / Nx;  dy = Ly / Ny;      % pas d'espace
+x  = (0:Nx)' * dx;                % vecteur x (Nx+1 pts)
+y  = (0:Ny)' * dy;                % vecteur y (Ny+1 pts)
+[X, Y] = meshgrid(x, y);          % grille 2D (pour plots)
+% Attention : meshgrid donne X(j,i), Y(j,i) -> taille (Ny+1)x(Nx+1)
+
+Ntot = (Nx+1)*(Ny+1);             % nombre total d'inconnues
+
+%% =========================================================
+%%  MATRICE LAPLACIEN 1D (Neumann, points fantomes)
+%% =========================================================
+function Ax = build_laplacian_1D(N, ds, D)
+% Construit la matrice tridiagonale du Laplacien 1D
+% avec conditions de Neumann (points fantomes)
+  e  = ones(N+1, 1);
+  Ax = spdiags([e, -2*e, e], -1:1, N+1, N+1);
+  % Conditions de Neumann
+  Ax(1,   2)   = 2;     % u_{-1} = u_1
+  Ax(end, end-1) = 2;   % u_{N+1} = u_{N-1}
+  Ax = (D / ds^2) * Ax;
+end
+
+Ax = build_laplacian_1D(Nx, dx, D);   % (Nx+1)x(Nx+1)
+Ay = build_laplacian_1D(Ny, dy, D);   % (Ny+1)x(Ny+1)
+
+% Laplacien 2D par produit de Kronecker
+Ix = speye(Nx+1);
+Iy = speye(Ny+1);
+A2D = kron(Iy, Ax) + kron(Ay, Ix);   % taille Ntot x Ntot
+
+%% =========================================================
+%%  FONCTION DE REACTION
+%% =========================================================
+f = @(u) u .* (1 - u) .* (u - a);
+
+%% =========================================================
+%%  CONDITION INITIALE
+%% =========================================================
+% Choix 1 : front plan vertical centre en x0
+x0 = Lx / 2;  sigma = 2;
+U0 = 1 ./ (1 + exp((X - x0) / sigma));  % taille (Ny+1)x(Nx+1)
+
+% Choix 2 (decommenter pour onde circulaire) :
+% R0 = 15;
+% r  = sqrt((X - Lx/2).^2 + (Y - Ly/2).^2);
+% U0 = double(r < R0);
+
+% Choix 3 (front plan perturbe) :
+% eps_pert = 5;
+% U0 = 1 ./ (1 + exp((X - x0 - eps_pert*sin(2*pi*Y/Ly)) / sigma));
+
+%% =========================================================
+%%  PAS DE TEMPS
+%% =========================================================
+h = min(dx, dy);        % pas min pour la CFL 2D
+
+% Pour les schemas explicites : mu <= 1/8 (AB2) ou 0.349 (RK4)
+% On prend mu = 0.12 pour satisfaire toutes les contraintes
+mu_exp = 0.12;
+dt_exp = mu_exp * h^2 / D;
+Nt_exp = ceil(T / dt_exp);
+dt_exp = T / Nt_exp;
+
+% Pour les schemas implicites : dt plus grand autorise
+dt_imp = 10 * dt_exp;
+Nt_imp = ceil(T / dt_imp);
+dt_imp = T / Nt_imp;
+
+fprintf('h=%.4f | dt_exp=%.6f (Nt=%d) | dt_imp=%.4f (Nt=%d)\n',...
+        h, dt_exp, Nt_exp, dt_imp, Nt_imp);
+
+%% =========================================================
+%%  FONCTIONS UTILITAIRES
+%% =========================================================
+% Applique le Laplacien 2D via la structure a 5 points (sans former A2D)
+% Plus efficace en memoire pour grandes grilles.
+% Pour ce script, on utilise A2D directement (clarté).
+
+% Vectorisation : U_vec = U(:) (Ntot x 1), retour : reshape(U_vec, Ny+1, Nx+1)
+vec2mat = @(v) reshape(v, Ny+1, Nx+1);
+
+%% =========================================================
+%%  SCHEMA 1 : Runge-Kutta d'ordre 4
+%% =========================================================
+fprintf('Schema RK4...\n');
+U = U0;
+u_vec = U(:);
+% G : fonction flux total (vectoriel)
+G = @(uv) A2D * uv + f(uv);
+
+front_RK4 = zeros(Nt_exp, 1);
+for n = 1:Nt_exp
+    K1 = G(u_vec);
+    K2 = G(u_vec + 0.5*dt_exp*K1);
+    K3 = G(u_vec + 0.5*dt_exp*K2);
+    K4 = G(u_vec + dt_exp*K3);
+    u_vec = u_vec + (dt_exp/6) * (K1 + 2*K2 + 2*K3 + K4);
+    % Suivi du front sur la ligne centrale j = Ny/2
+    U_mat = vec2mat(u_vec);
+    u_mid = U_mat(round(Ny/2)+1, :);  % profil au centre en y
+    idx = find(u_mid(1:end-1) >= 0.5 & u_mid(2:end) < 0.5, 1);
+    if ~isempty(idx)
+        front_RK4(n) = x(idx) + dx*(0.5-u_mid(idx))/(u_mid(idx+1)-u_mid(idx));
+    end
+end
+U_RK4 = vec2mat(u_vec);
+
+%% =========================================================
+%%  SCHEMA 2 : Euler Implicite (semi-implicite)
+%%  (I - dt*A2D)*U^{n+1} = U^n + dt*f(U^n)
+%% =========================================================
+fprintf('Schema Euler Implicite...\n');
+I2D   = speye(Ntot);
+M_EI  = I2D - dt_imp * A2D;   % factorise une fois
+[L_EI, U_EI_mat, P_EI] = lu(M_EI);   % factorisation LU
+
+u_vec = U0(:);
+front_EI = zeros(Nt_imp, 1);
+for n = 1:Nt_imp
+    rhs   = u_vec + dt_imp * f(u_vec);
+    u_vec = U_EI_mat \ (L_EI \ (P_EI * rhs));   % resolution LU
+    U_mat = vec2mat(u_vec);
+    u_mid = U_mat(round(Ny/2)+1, :);
+    idx = find(u_mid(1:end-1) >= 0.5 & u_mid(2:end) < 0.5, 1);
+    if ~isempty(idx)
+        front_EI(n) = x(idx) + dx*(0.5-u_mid(idx))/(u_mid(idx+1)-u_mid(idx));
+    end
+end
+U_EI_final = vec2mat(u_vec);
+
+%% =========================================================
+%%  SCHEMA 2b : Euler Implicite avec ADI (Peaceman-Rachford)
+%%  Demi-pas 1 : (I - dt/2*Ax_kron)*U^{n+1/2} = (I+dt/2*Ay_kron)*U^n + dt*f(U^n)
+%%  Demi-pas 2 : (I - dt/2*Ay_kron)*U^{n+1}   = (I+dt/2*Ax_kron)*U^{n+1/2}
+%%
+%%  Implementation ligne-par-ligne (efficacite memoire)
+%% =========================================================
+fprintf('Schema Euler Implicite ADI...\n');
+% Matrices 1D utiles pour l'ADI
+Ix1 = speye(Nx+1);
+Iy1 = speye(Ny+1);
+% Matrices pour les demi-pas
+alpha_x = dt_imp/2;  alpha_y = dt_imp/2;
+Mx_adi = Ix1 - alpha_x * Ax;    % (Nx+1)x(Nx+1) tridiag
+My_adi = Iy1 - alpha_y * Ay;    % (Ny+1)x(Ny+1) tridiag
+% Factorisations 1D
+[Lx_adi, Ux_adi, Px_adi] = lu(Mx_adi);
+[Ly_adi, Uy_adi, Py_adi] = lu(My_adi);
+
+U_adi = U0;   % (Ny+1)x(Nx+1)
+front_ADI = zeros(Nt_imp, 1);
+for n = 1:Nt_imp
+    % -- Demi-pas 1 : implicite en x, ligne par ligne (j fixe) --
+    Uhalf = zeros(Ny+1, Nx+1);
+    for j = 1:Ny+1
+        rhs_j = U_adi(j,:)' ...              % U^n a la ligne j
+              + alpha_y * (Ay * U_adi(j,:)') ... % terme y explicite
+              + dt_imp * f(U_adi(j,:)');      % reaction explicite
+        % Resoudre (I - alpha_x*Ax) * Uhalf(j,:)' = rhs_j
+        Uhalf(j,:) = (Ux_adi \ (Lx_adi \ (Px_adi * rhs_j)))';
+    end
+    % -- Demi-pas 2 : implicite en y, colonne par colonne (i fixe) --
+    U_new = zeros(Ny+1, Nx+1);
+    for i = 1:Nx+1
+        rhs_i = Uhalf(:,i) ...
+              + alpha_x * (Ax * Uhalf(:,i));   % terme x explicite
+        % Note : (I+alpha_x*Ax)*Uhalf(:,i) -- ici Ax agit sur les colonnes
+        % On transpose la logique : A agit bien dans la bonne direction
+        U_new(:,i) = Uy_adi \ (Ly_adi \ (Py_adi * rhs_i));
+    end
+    U_adi = U_new;
+    u_mid = U_adi(round(Ny/2)+1, :);
+    idx = find(u_mid(1:end-1) >= 0.5 & u_mid(2:end) < 0.5, 1);
+    if ~isempty(idx)
+        front_ADI(n) = x(idx) + dx*(0.5-u_mid(idx))/(u_mid(idx+1)-u_mid(idx));
+    end
+end
+U_ADI_final = U_adi;
+
+%% =========================================================
+%%  SCHEMA 3 : Adams-Bashforth 2
+%%  Initialisation : un pas Euler explicite
+%% =========================================================
+fprintf('Schema AB2...\n');
+u_vec = U0(:);
+G_old = G(u_vec);
+u_vec = u_vec + dt_exp * G_old;    % pas 1 : Euler explicite
+G_new = G(u_vec);
+
+front_AB2 = zeros(Nt_exp, 1);
+for n = 2:Nt_exp
+    u_vec = u_vec + dt_exp * (1.5*G_new - 0.5*G_old);
+    G_old = G_new;
+    G_new = G(u_vec);
+    U_mat = vec2mat(u_vec);
+    u_mid = U_mat(round(Ny/2)+1, :);
+    idx = find(u_mid(1:end-1) >= 0.5 & u_mid(2:end) < 0.5, 1);
+    if ~isempty(idx)
+        front_AB2(n) = x(idx) + dx*(0.5-u_mid(idx))/(u_mid(idx+1)-u_mid(idx));
+    end
+end
+U_AB2 = vec2mat(u_vec);
+
+%% =========================================================
+%%  SCHEMA 4 : Adams-Moulton 2 (semi-implicite)
+%%  (I - dt/2*A2D)*U^{n+1} = U^n + dt/2*(A2D*U^n + 2*f(U^n))
+%% =========================================================
+fprintf('Schema AM2...\n');
+M_AM2 = I2D - (dt_imp/2) * A2D;
+[L_AM2, U_AM2_mat, P_AM2] = lu(M_AM2);
+
+u_vec = U0(:);
+front_AM2 = zeros(Nt_imp, 1);
+for n = 1:Nt_imp
+    rhs   = u_vec + (dt_imp/2) * (A2D*u_vec + 2*f(u_vec));
+    u_vec = U_AM2_mat \ (L_AM2 \ (P_AM2 * rhs));
+    U_mat = vec2mat(u_vec);
+    u_mid = U_mat(round(Ny/2)+1, :);
+    idx = find(u_mid(1:end-1) >= 0.5 & u_mid(2:end) < 0.5, 1);
+    if ~isempty(idx)
+        front_AM2(n) = x(idx) + dx*(0.5-u_mid(idx))/(u_mid(idx+1)-u_mid(idx));
+    end
+end
+U_AM2_final = vec2mat(u_vec);
+
+%% =========================================================
+%%  VITESSE THEORIQUE
+%% =========================================================
+c_th = sqrt(2*D) * (0.5 - a);
+fprintf('Vitesse theorique : c* = %.4f\n', c_th);
+
+%% =========================================================
+%%  FIGURES
+%% =========================================================
+
+% -- Figure 1 : Profils 2D finaux (RK4) --
+figure('Name','Profils 2D');
+subplot(2,2,1);
+imagesc(x, y, U_RK4); colorbar; axis xy;
+title('RK4'); xlabel('x'); ylabel('y');
+caxis([0 1]); colormap(jet);
+
+subplot(2,2,2);
+imagesc(x, y, U_EI_final); colorbar; axis xy;
+title('Euler Implicite'); xlabel('x'); ylabel('y');
+caxis([0 1]);
+
+subplot(2,2,3);
+imagesc(x, y, U_AB2); colorbar; axis xy;
+title('Adams-Bashforth 2'); xlabel('x'); ylabel('y');
+caxis([0 1]);
+
+subplot(2,2,4);
+imagesc(x, y, U_AM2_final); colorbar; axis xy;
+title('Adams-Moulton 2'); xlabel('x'); ylabel('y');
+caxis([0 1]);
+sgtitle('Profil 2D u(x,y,T) -- comparaison des schemas');
+
+% -- Figure 2 : Isovaleurs u = 0.5 (position du front) --
+figure('Name','Isovaleurs front');
+[~, h_rk] = contour(X, Y, U_RK4,  [0.5 0.5], 'b-', 'LineWidth', 2);
+hold on;
+[~, h_ei] = contour(X, Y, U_EI_final,  [0.5 0.5], 'r-', 'LineWidth', 2);
+[~, h_ab] = contour(X, Y, U_AB2,  [0.5 0.5], 'g-', 'LineWidth', 2);
+[~, h_am] = contour(X, Y, U_AM2_final, [0.5 0.5], 'm-', 'LineWidth', 2);
+legend({'RK4','Euler impl.','AB2','AM2'}, 'Location', 'best');
+xlabel('x'); ylabel('y');
+title('Isovaleur u=0.5 a T (position du front 2D)');
+grid on; axis equal;
+
+% -- Figure 3 : Position du front en temps (ligne centrale) --
+t_exp = (1:Nt_exp)' * dt_exp;
+t_imp = (1:Nt_imp)' * dt_imp;
+figure('Name','Suivi du front');
+plot(t_exp, front_RK4, 'b-',  'LineWidth', 1.5, 'DisplayName', 'RK4');    hold on;
+plot(t_imp, front_EI,  'r-',  'LineWidth', 1.5, 'DisplayName', 'Euler impl.');
+plot(t_exp, front_AB2, 'g.',  'DisplayName', 'AB2');
+plot(t_imp, front_AM2, 'm-',  'LineWidth', 1.5, 'DisplayName', 'AM2');
+plot([0 T], [Lx/2, Lx/2+c_th*T], 'k--', 'LineWidth', 1.5, ...
+     'DisplayName', sprintf('Theorique c*=%.3f', c_th));
+xlabel('t'); ylabel('x_{front}');
+title('Position du front (ligne centrale y=Ly/2) au cours du temps');
+legend('Location','best'); grid on;
+
+% -- Figure 4 : Surface 3D du profil final RK4 --
+figure('Name','Surface 3D');
+surf(X, Y, U_RK4, 'EdgeColor', 'none');
+colormap(jet); colorbar;
+xlabel('x'); ylabel('y'); zlabel('u');
+title('Profil final u(x,y,T) -- RK4 (surface 3D)');
+view(45, 30);
+\end{lstlisting}
+\end{comment}
+
+% =============================================================================
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+% =============================================================================
+
+L'\'equation de Nagumo en dimension~2 constitue un mod\`ele paradigmatique riche pour
+les ph\'enom\`enes de r\'eaction-diffusion bistables~\cite{Grindrod1988}.
+L'\'etude pr\'esent\'ee a permis de d\'emontrer plusieurs r\'esultats fondamentaux :
+
+\medskip
+\noindent\textbf{Sur le plan th\'eorique.}
+\begin{itemize}[leftmargin=1.5em]
+  \item Les fronts plans en 2D satisfont exactement la m\^eme ODE qu'en 1D, ind\'ependamment
+        de la direction de propagation. La vitesse $c^*=\sqrt{2D}(1/2-a)$ est donc
+        une constante intrins\`eque du syst\`eme, ind\'ependante de la g\'eom\'etrie.
+  \item Pour les fronts courbes, l'\'equation eikonale $v_n\approx c^*-D\sqrt{2D}\,\kappa$
+        r\'ev\`ele le r\^ole r\'egularisant de la courbure : les fronts convexes ralentissent,
+        les concaves acc\'el\`erent.
+  \item Le principe du maximum s'\'etend \`a la dimension~2 sans modification : les solutions
+        restent born\'ees dans $[0,1]$ si la donn\'ee initiale l'est.
+\end{itemize}
+
+\medskip
+\noindent\textbf{Sur le plan num\'erique.}
+\begin{itemize}[leftmargin=1.5em]
+  \item La discr\'etisation par le sch\'ema \`a cinq points du Laplacien 2D est d'ordre~2
+        en espace. La structure de Kronecker $A_{2D}=I\otimes A_x + A_y\otimes I$ permet
+        une impl\'ementation efficace.
+  \item \textbf{Les conditions CFL sont exactement deux fois plus restrictives en 2D qu'en 1D}
+        pour les sch\'emas explicites, en raison du facteur~2 dans $|\lambda_{\max}(A_{2D})|$.
+  \item La m\'ethode ADI de Peaceman-Rachford \'evite la r\'esolution d'un syst\`eme 2D
+        global en d\'ecomposant le probl\`eme implicite en syst\`emes 1D tridiagonaux
+        efficaces, tout en pr\'eservant la stabilit\'e inconditionnelle (A-stabilit\'e).
+  \item RK4 reste la m\'ethode explicite de r\'ef\'erence (ordre~4) ; AM2+ADI est la m\'ethode
+        implicite la plus efficace (ordre~2, co\^ut $O(N^2)$ par pas) pour les simulations
+        2D intensives.
+\end{itemize}
+
+% =============================================================================
+\chapter*{Annexes}
+\addcontentsline{toc}{chapter}{Annexes}
+% =============================================================================
+
+\section*{Annexe~A -- Formules utiles}
+\begin{align*}
+  f(u)    &= u(1-u)(u-a),\quad f'(u)=-3u^2+2(1+a)u-a,\\
+  c^*     &= \sqrt{2D}\!\left(\frac{1}{2}-a\right),\quad
+  \phi^*(\xi)=\frac{1}{1+e^{\xi/\sqrt{2D}}},\\
+  \xi_{k_1,k_2} &= -\frac{4D}{(\Delta x)^2}\sin^2\!\frac{k_1\Delta x}{2}
+                   -\frac{4D}{(\Delta y)^2}\sin^2\!\frac{k_2\Delta y}{2},\\
+  |\xi_{\max}^{2D}| &= \frac{8D}{h^2} = 2\,|\xi_{\max}^{1D}|
+  \quad\text{(grille uniforme }h=\Delta x=\Delta y\text{)}.
+\end{align*}
+
+\section*{Annexe~B -- R\'ecapitulatif des sch\'emas en 2D}
+
+\begin{longtable}{@{}p{2.8cm}p{1.8cm}p{1.2cm}p{1.5cm}p{3.5cm}p{3cm}@{}}
+\toprule
+M\'ethode & Type & Ordre & CFL 2D ($\mu$) & Syst\`eme \`a r\'esoudre & Remarque \\
+\midrule
+RK4                 & explicite & 4 & $\le 0{,}349$ & aucun   & best explicite \\
+Euler impl.\ (plein)& implicite & 1 & aucune        & $A_{2D}$ (bloc) & co\^uteux \\
+Euler impl.\ (ADI)  & implicite & 1 & aucune        & 2 tridag.\ 1D   & efficace  \\
+AB2                 & explicite & 2 & $\le 1/8$     & aucun   & 2 niveaux requis \\
+AM2 (ADI)           & implicite & 2 & aucune        & 2 tridag.\ 1D   & optimal 2D \\
+\bottomrule
+\end{longtable}
+
+\section*{Annexe~C -- Compilation}
+\begin{verbatim}
+pdflatex nagumo_2D.tex
+pdflatex nagumo_2D.tex
+\end{verbatim}
+
+% =============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{Nagumo1962}
+J.~Nagumo, S.~Arimoto, S.~Yoshizawa,
+\textit{An active pulse transmission line simulating nerve axon},
+Proc.~IRE, 50(10):2061--2070, 1962.
+
+\bibitem{MurrayMathematicalBiology}
+J.~D.~Murray,
+\textit{Mathematical Biology~I: An Introduction},
+3rd ed., Springer, 2002.
+
+\bibitem{Volpert2000}
+A.~Volpert, V.~Volpert, V.~Volpert,
+\textit{Traveling Wave Solutions of Parabolic Systems},
+American Mathematical Society, 1994.
+
+\bibitem{Winfree1980}
+A.~T.~Winfree,
+\textit{The Geometry of Biological Time},
+Springer, 1980.
+
+\bibitem{FifeMcLeod1977}
+P.~C.~Fife, J.~B.~McLeod,
+\textit{The approach of solutions of nonlinear diffusion equations to
+travelling front solutions},
+Arch.~Rational Mech.~Anal., 65(4):335--361, 1977.
+
+\bibitem{Rubinstein1989}
+J.~Rubinstein, P.~Sternberg, J.~B.~Keller,
+\textit{Fast reaction, slow diffusion, and curve shortening},
+SIAM J.~Appl.~Math., 49(1):116--133, 1989.
+
+\bibitem{EvansGariepy2015}
+L.~C.~Evans,
+\textit{Partial Differential Equations},
+2nd ed., American Mathematical Society, 2010.
+
+\bibitem{Protter1967}
+M.~H.~Protter, H.~F.~Weinberger,
+\textit{Maximum Principles in Differential Equations},
+Prentice-Hall, 1967.
+
+\bibitem{Strikwerda2004}
+J.~C.~Strikwerda,
+\textit{Finite Difference Schemes and Partial Differential Equations},
+2nd ed., SIAM, 2004.
+
+\bibitem{LeVeque2007}
+R.~J.~LeVeque,
+\textit{Finite Difference Methods for Ordinary and Partial Differential Equations},
+SIAM, 2007.
+
+\bibitem{PeacemanRachford1955}
+D.~W.~Peaceman, H.~H.~Rachford,
+\textit{The numerical solution of parabolic and elliptic differential equations},
+J.~Soc.~Ind.~Appl.~Math., 3(1):28--41, 1955.
+
+\bibitem{DouglasFrankl1956}
+J.~Douglas, D.~W.~Peaceman,
+\textit{Numerical solution of two-dimensional heat flow problems},
+AIChE Journal, 1(4):505--512, 1955.
+
+\bibitem{Trefethen1996}
+L.~N.~Trefethen,
+\textit{Finite Difference and Spectral Methods for Ordinary and
+Partial Differential Equations},
+Cornell University, 1996.
+
+\bibitem{Hundsdorfer1995}
+W.~Hundsdorfer, J.~G.~Verwer,
+\textit{Numerical Solution of Time-Dependent Advection-Diffusion-Reaction Equations},
+Springer, 2003.
+
+\bibitem{Grindrod1988}
+P.~Grindrod,
+\textit{The Theory and Applications of Reaction-Diffusion Equations},
+2nd ed., Oxford University Press, 1996.
+
+\end{thebibliography}
+
+\end{document}
