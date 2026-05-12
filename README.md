@@ -154,12 +154,3 @@ Lien du projet : [https://github.com/votre-username/fitzhugh-nagumo-model](https
 ---
 
 ⭐️ **N'hésitez pas à mettre une étoile sur ce repository !** ⭐️
-```
-
-
-1. ✅ **Pousser tous les fichiers** sur GitHub
-2. ✅ **Créer un `.gitignore`** pour éviter les fichiers temporaires (`.ipynb_checkpoints/`, `*.aux`, `*.log`)
-3. ✅ **Ajouter une licence** (MIT recommandée)
-4. ✅ **Mettre à jour le notebook** avec plus de commentaires si nécessaire
-
-Voulez-vous que je génère aussi le fichier `.gitignore` adapté à votre projet (Python + Jupyter + LaTeX) ?
